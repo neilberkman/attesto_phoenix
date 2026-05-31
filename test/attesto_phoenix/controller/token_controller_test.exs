@@ -411,6 +411,103 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
     end
   end
 
+  describe "denial events" do
+    test "emits token_denied for invalid client authentication" do
+      capture_events()
+
+      conn =
+        post_token(%{
+          "grant_type" => "client_credentials",
+          "client_id" => "confidential-1",
+          "client_secret" => "wrong",
+          "scope" => "read"
+        })
+
+      assert conn.status == 400
+
+      assert_receive {:event,
+                      %AttestoPhoenix.Event{
+                        name: :token_denied,
+                        client_id: "confidential-1",
+                        grant_type: "client_credentials",
+                        scope: "read",
+                        result: "invalid_client",
+                        metadata: metadata
+                      }}
+
+      assert metadata.error == "invalid_client"
+      assert metadata.http_status == 400
+      assert metadata.sender_constraint == %{dpop_present: false, mtls_cert_present: false}
+    end
+
+    test "emits token_denied when a valid client omits grant_type" do
+      capture_events()
+
+      conn =
+        post_token(%{
+          "client_id" => "confidential-1",
+          "client_secret" => "s3cr3t",
+          "scope" => "read"
+        })
+
+      assert conn.status == 400
+
+      assert_receive {:event,
+                      %AttestoPhoenix.Event{
+                        name: :token_denied,
+                        client_id: "confidential-1",
+                        grant_type: nil,
+                        scope: "read",
+                        result: "invalid_request"
+                      }}
+    end
+
+    test "emits token_denied for unsupported grants after client authentication" do
+      capture_events()
+
+      conn =
+        post_token(%{
+          "grant_type" => "password",
+          "client_id" => "confidential-1",
+          "client_secret" => "s3cr3t"
+        })
+
+      assert conn.status == 400
+
+      assert_receive {:event,
+                      %AttestoPhoenix.Event{
+                        name: :token_denied,
+                        client_id: "confidential-1",
+                        grant_type: "password",
+                        result: "unsupported_grant_type"
+                      }}
+    end
+
+    test "emits token_denied for invalid scope decisions" do
+      capture_events()
+      enable_minting()
+      put_config(authorize_scope: fn _client, _requested -> {:error, :invalid_scope} end)
+
+      conn =
+        post_token(%{
+          "grant_type" => "client_credentials",
+          "client_id" => "public-1",
+          "scope" => "admin"
+        })
+
+      assert conn.status == 400
+
+      assert_receive {:event,
+                      %AttestoPhoenix.Event{
+                        name: :token_denied,
+                        client_id: "public-1",
+                        grant_type: "client_credentials",
+                        scope: "admin",
+                        result: "invalid_scope"
+                      }}
+    end
+  end
+
   # FIX 1 - PUBLIC-CLIENT ENFORCEMENT (RFC 6749 §2.1 / §2.3.1).
   describe "public-client enforcement (RFC 6749 §2.1)" do
     test "a confidential client cannot authenticate with client_id and no secret" do
@@ -917,6 +1014,11 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
       end,
       client_id: fn client -> Map.get(client, :id) end
     )
+  end
+
+  defp capture_events do
+    test_pid = self()
+    put_config(on_event: fn event -> send(test_pid, {:event, event}) end)
   end
 
   defp attesto_config do

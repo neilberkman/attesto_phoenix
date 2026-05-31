@@ -6,6 +6,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.1]
+
+- Emit `:token_denied` audit/telemetry events for token endpoint failures,
+  including OAuth error, status, client/grant/scope context when available, and
+  sender-constraint presence.
+- Normalize Phoenix callback specs before handing `:cert_der` to core Attesto
+  protected-resource verification, so function captures, `{Module, function}`,
+  and `{Module, function, extra_args}` all work consistently.
+
 ## [0.6.0]
 
 Initial release: a Phoenix/Ecto OAuth 2.0 / OIDC authorization server layer

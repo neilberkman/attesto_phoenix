@@ -28,6 +28,12 @@ defmodule AttestoPhoenix.Plug.AuthenticateTest do
     def verification_pems, do: [signing_pem()]
   end
 
+  defmodule CertCallbacks do
+    @moduledoc false
+
+    def cert_der(_conn), do: Process.get(:attesto_phoenix_test_cert_der)
+  end
+
   @user_kind Attesto.PrincipalKind.new("user", "ou_",
                required_claims: [{"client_id", :non_empty_string}]
              )
@@ -161,6 +167,25 @@ defmodule AttestoPhoenix.Plug.AuthenticateTest do
     assert ["Bearer " <> _] = get_resp_header(conn, "www-authenticate")
   end
 
+  test "normalizes {module, function} cert_der callbacks before calling core", %{config: config} do
+    der = self_signed_cert_der()
+    {:ok, thumbprint} = Attesto.MTLS.compute_thumbprint(der)
+    Process.put(:attesto_phoenix_test_cert_der, der)
+
+    config = %{config | mtls_enabled: true, cert_der: {__MODULE__.CertCallbacks, :cert_der}}
+    token = mint(config, scope: "openid", mtls_cert_thumbprint: thumbprint)
+
+    conn =
+      :get
+      |> conn("/reports")
+      |> put_req_header("authorization", "Bearer " <> token)
+      |> Authenticate.call(Authenticate.init(config: config))
+
+    refute conn.halted
+    assert conn.assigns.attesto_claims["cnf"]["x5t#S256"] == thumbprint
+    assert_receive {:event, %AttestoPhoenix.Event{name: :auth_succeeded, subject: @subject}}
+  end
+
   defp mint(config, opts) do
     attesto_config = Config.to_attesto_config(config, principal_kinds: [@user_kind])
 
@@ -171,7 +196,18 @@ defmodule AttestoPhoenix.Plug.AuthenticateTest do
       claims: %{"client_id" => "client-1"}
     }
 
-    {:ok, %{access_token: token}} = Token.mint(attesto_config, principal)
+    mint_opts =
+      case Keyword.get(opts, :mtls_cert_thumbprint) do
+        nil -> []
+        thumbprint -> [mtls_cert_thumbprint: thumbprint]
+      end
+
+    {:ok, %{access_token: token}} = Token.mint(attesto_config, principal, mint_opts)
     token
+  end
+
+  defp self_signed_cert_der do
+    %{cert: der} = :public_key.pkix_test_root_cert(~c"CN=attesto-phoenix-plug-test", [])
+    der
   end
 end

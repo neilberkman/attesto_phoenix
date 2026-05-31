@@ -152,20 +152,48 @@ defmodule AttestoPhoenix.Controller.TokenController do
     config = resolve_config()
     conn = put_no_store_headers(conn)
 
-    with :ok <- RequestContext.check_https(conn, config),
-         {:ok, client} <- authenticate_client(config, conn, params),
-         {:ok, grant_type} <- fetch_grant_type(params),
-         {:ok, response} <- dispatch(config, conn, client, grant_type, params) do
-      conn
-      |> put_status(:ok)
-      |> json(response)
-    else
+    case RequestContext.check_https(conn, config) do
+      :ok ->
+        create_checked(config, conn, params)
+
       {:error, :insecure_transport} ->
         # RFC 6749 §3.2 / §10.1: the token endpoint requires TLS.
-        render_error(conn, error(@error_invalid_request, "TLS required"))
+        render_token_error(
+          config,
+          conn,
+          params,
+          nil,
+          nil,
+          error(@error_invalid_request, "TLS required")
+        )
+    end
+  end
+
+  defp create_checked(config, conn, params) do
+    case authenticate_client(config, conn, params) do
+      {:ok, client} ->
+        create_authenticated(config, conn, params, client)
 
       {:error, %{} = err} ->
-        render_error(conn, err)
+        render_token_error(config, conn, params, nil, nil, err)
+    end
+  end
+
+  defp create_authenticated(config, conn, params, client) do
+    case fetch_grant_type(params) do
+      {:ok, grant_type} ->
+        case dispatch(config, conn, client, grant_type, params) do
+          {:ok, response} ->
+            conn
+            |> put_status(:ok)
+            |> json(response)
+
+          {:error, %{} = err} ->
+            render_token_error(config, conn, params, client, grant_type, err)
+        end
+
+      {:error, %{} = err} ->
+        render_token_error(config, conn, params, client, nil, err)
     end
   end
 
@@ -1125,7 +1153,59 @@ defmodule AttestoPhoenix.Controller.TokenController do
     })
   end
 
+  defp emit_denied(config, conn, params, client, grant_type, %{error: code} = err) do
+    Event.emit(config, :token_denied, %{
+      client_id: denial_client_id(config, conn, params, client),
+      scope: optional_param(params, "scope"),
+      grant_type: grant_type || optional_param(params, "grant_type"),
+      result: code,
+      metadata:
+        %{
+          client_ip: RequestContext.client_ip(conn, config),
+          error: code,
+          error_description: Map.get(err, :description),
+          http_status: Map.get(err, :status, 400),
+          sender_constraint: sender_constraint_context(config, conn)
+        }
+        |> Enum.reject(fn {_key, value} -> is_nil(value) end)
+        |> Map.new()
+    })
+  end
+
+  defp denial_client_id(config, conn, params, client) when not is_nil(client) do
+    client_id(config, client) || request_client_id(conn, params)
+  end
+
+  defp denial_client_id(_config, conn, params, _client) do
+    request_client_id(conn, params)
+  end
+
+  defp request_client_id(conn, params),
+    do: optional_param(params, "client_id") || basic_client_id(conn)
+
+  defp basic_client_id(conn) do
+    with ["Basic " <> encoded] <- get_req_header(conn, "authorization"),
+         {:ok, decoded} <- Base.decode64(encoded),
+         [client_id, _secret] <- String.split(decoded, ":", parts: 2) do
+      URI.decode_www_form(client_id)
+    else
+      _ -> nil
+    end
+  end
+
+  defp sender_constraint_context(config, conn) do
+    %{
+      dpop_present: dpop_present?(conn),
+      mtls_cert_present: mtls_cert_present?(config, conn)
+    }
+  end
+
   # ── Rendering (RFC 6749 §5) ──────────────────────────────────────────────
+
+  defp render_token_error(config, conn, params, client, grant_type, err) do
+    emit_denied(config, conn, params, client, grant_type, err)
+    render_error(conn, err)
+  end
 
   defp render_error(conn, %{error: code} = err) do
     conn

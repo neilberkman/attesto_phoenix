@@ -168,7 +168,9 @@ defmodule AttestoPhoenix.Plug.Authenticate do
 
   defp nonce_issue(_config), do: nil
 
-  defp cert_der(%Config{mtls_enabled: true, cert_der: cert_der}), do: cert_der
+  defp cert_der(%Config{mtls_enabled: true, cert_der: cert_der}) when not is_nil(cert_der),
+    do: normalize_callback(cert_der)
+
   defp cert_der(_config), do: nil
 
   defp emit_succeeded(config, claims) do
@@ -229,4 +231,14 @@ defmodule AttestoPhoenix.Plug.Authenticate do
 
   defp invoke({module, fun, extra}, args) when is_atom(module) and is_atom(fun),
     do: apply(module, fun, args ++ extra)
+
+  defp normalize_callback(callback) when is_function(callback), do: callback
+
+  defp normalize_callback({module, fun}) when is_atom(module) and is_atom(fun) do
+    fn conn -> apply(module, fun, [conn]) end
+  end
+
+  defp normalize_callback({module, fun, extra}) when is_atom(module) and is_atom(fun) do
+    fn conn -> apply(module, fun, [conn | extra]) end
+  end
 end
