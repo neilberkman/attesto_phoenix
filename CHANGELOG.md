@@ -6,6 +6,12 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.2]
+
+- Advertise `response_modes_supported: ["query"]` from the RFC 8414 OAuth
+  Authorization Server Metadata endpoint, matching the authorization-code
+  redirect response mode already used by the Phoenix authorization endpoint.
+
 ## [0.6.1]
 
 - Emit `:token_denied` audit/telemetry events for token endpoint failures,

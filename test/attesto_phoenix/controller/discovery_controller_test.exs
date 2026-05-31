@@ -69,6 +69,7 @@ defmodule AttestoPhoenix.Controller.DiscoveryControllerTest do
       assert body["token_endpoint"] == "#{@issuer}/oauth/token"
       assert body["jwks_uri"] == "#{@issuer}/.well-known/jwks.json"
       assert "code" in body["response_types_supported"]
+      assert body["response_modes_supported"] == ["query"]
     end
 
     test "advertises S256 as the only code challenge method (RFC 7636)" do

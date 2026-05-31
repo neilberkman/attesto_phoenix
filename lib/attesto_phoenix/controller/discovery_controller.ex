@@ -69,6 +69,10 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
   # supports the "code" response type. Fixed by protocol, not configured.
   @response_types_supported ["code"]
 
+  # RFC 8414 §2 `response_modes_supported`: the Phoenix authorization-code
+  # endpoint returns the code and state as redirect query parameters.
+  @response_modes_supported ["query"]
+
   # RFC 8414 §2 `grant_types_supported`: the grant types the token endpoint
   # (`AttestoPhoenix.Controller.TokenController`) actually dispatches -
   # `authorization_code` (RFC 6749 §4.1), `refresh_token` (RFC 6749 §6), and
@@ -151,6 +155,7 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
   defp discovery_opts(%Config{} = config) do
     [
       response_types_supported: @response_types_supported,
+      response_modes_supported: @response_modes_supported,
       grant_types_supported: @grant_types_supported,
       token_endpoint_auth_methods_supported: @token_endpoint_auth_methods_supported,
       scopes_supported: presence(config.scopes_supported),
