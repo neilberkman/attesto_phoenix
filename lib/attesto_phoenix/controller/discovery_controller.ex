@@ -113,7 +113,10 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
     config = fetch_config!(conn)
     protocol_config = fetch_protocol_config!(conn)
 
-    metadata = Discovery.metadata(protocol_config, discovery_opts(config))
+    metadata =
+      protocol_config
+      |> Discovery.metadata(discovery_opts(config))
+      |> put_fapi_metadata(config)
 
     conn
     |> put_cache_control()
@@ -158,6 +161,9 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
       response_modes_supported: @response_modes_supported,
       grant_types_supported: @grant_types_supported,
       token_endpoint_auth_methods_supported: token_endpoint_auth_methods_supported(config),
+      token_endpoint_auth_signing_alg_values_supported: Attesto.SigningAlg.allowed(),
+      authorization_response_iss_parameter_supported:
+        authorization_response_iss_parameter_supported(config),
       scopes_supported: presence(config.scopes_supported),
       require_pushed_authorization_requests: require_pushed_authorization_requests(config),
       pushed_authorization_request_endpoint: pushed_authorization_request_endpoint(config),
@@ -174,12 +180,33 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
   defp token_endpoint_auth_methods_supported(%Config{}),
     do: @token_endpoint_auth_methods_supported
 
+  defp put_fapi_metadata(metadata, %Config{} = config) do
+    metadata
+    |> Map.put("token_endpoint_auth_signing_alg_values_supported", Attesto.SigningAlg.allowed())
+    |> put_authorization_response_iss_supported(config)
+  end
+
+  defp put_authorization_response_iss_supported(metadata, %Config{
+         authorization_response_iss: true
+       }) do
+    Map.put(metadata, "authorization_response_iss_parameter_supported", true)
+  end
+
+  defp put_authorization_response_iss_supported(metadata, %Config{}), do: metadata
+
   defp require_pushed_authorization_requests(%Config{
          require_pushed_authorization_requests: true
        }),
        do: true
 
   defp require_pushed_authorization_requests(%Config{}), do: nil
+
+  defp authorization_response_iss_parameter_supported(%Config{
+         authorization_response_iss: true
+       }),
+       do: true
+
+  defp authorization_response_iss_parameter_supported(%Config{}), do: nil
 
   defp pushed_authorization_request_endpoint(%Config{} = config),
     do: Config.par_endpoint_url(config)

@@ -6,6 +6,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.9] - 2026-06-01
+
+### Added
+
+- Advertise FAPI-required discovery metadata when configured:
+  `authorization_response_iss_parameter_supported: true` when RFC 9207
+  authorization-response `iss` is enabled, and
+  `token_endpoint_auth_signing_alg_values_supported` from Attesto's asymmetric
+  signing algorithm set for `private_key_jwt` clients.
+
 ## [0.6.8] - 2026-06-01
 
 ### Added

@@ -115,6 +115,29 @@ defmodule AttestoPhoenix.Controller.DiscoveryControllerTest do
       assert body["token_endpoint_auth_methods_supported"] == ["private_key_jwt"]
     end
 
+    test "advertises private_key_jwt signing algorithms for client assertions" do
+      body = call_show(host_config(), protocol_config()) |> decode_body()
+
+      assert body["token_endpoint_auth_signing_alg_values_supported"] ==
+               Attesto.SigningAlg.allowed()
+    end
+
+    test "advertises RFC 9207 authorization response iss support when enabled" do
+      host = host_config(authorization_response_iss: true)
+
+      body = call_show(host, protocol_config()) |> decode_body()
+
+      assert body["authorization_response_iss_parameter_supported"] == true
+    end
+
+    test "omits RFC 9207 authorization response iss support when disabled" do
+      body =
+        call_show(host_config(authorization_response_iss: false), protocol_config())
+        |> decode_body()
+
+      refute Map.has_key?(body, "authorization_response_iss_parameter_supported")
+    end
+
     test "advertises when pushed authorization requests are required" do
       host = host_config(require_pushed_authorization_requests: true)
 

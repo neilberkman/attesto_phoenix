@@ -136,7 +136,10 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
     config = fetch_config!(conn)
     protocol_config = fetch_protocol_config!(conn)
 
-    metadata = OpenIDDiscovery.metadata(protocol_config, discovery_opts(config))
+    metadata =
+      protocol_config
+      |> OpenIDDiscovery.metadata(discovery_opts(config))
+      |> put_fapi_metadata(config)
 
     conn
     |> put_cache_control()
@@ -193,6 +196,9 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
       response_modes_supported: @response_modes_supported,
       grant_types_supported: @grant_types_supported,
       token_endpoint_auth_methods_supported: token_endpoint_auth_methods_supported(config),
+      token_endpoint_auth_signing_alg_values_supported: Attesto.SigningAlg.allowed(),
+      authorization_response_iss_parameter_supported:
+        authorization_response_iss_parameter_supported(config),
       authorization_endpoint: config.authorization_endpoint,
       userinfo_endpoint: config.userinfo_endpoint,
       revocation_endpoint: revocation_endpoint(config),
@@ -221,12 +227,33 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
   defp token_endpoint_auth_methods_supported(%Config{}),
     do: @token_endpoint_auth_methods_supported
 
+  defp put_fapi_metadata(metadata, %Config{} = config) do
+    metadata
+    |> Map.put("token_endpoint_auth_signing_alg_values_supported", Attesto.SigningAlg.allowed())
+    |> put_authorization_response_iss_supported(config)
+  end
+
+  defp put_authorization_response_iss_supported(metadata, %Config{
+         authorization_response_iss: true
+       }) do
+    Map.put(metadata, "authorization_response_iss_parameter_supported", true)
+  end
+
+  defp put_authorization_response_iss_supported(metadata, %Config{}), do: metadata
+
   defp require_pushed_authorization_requests(%Config{
          require_pushed_authorization_requests: true
        }),
        do: true
 
   defp require_pushed_authorization_requests(%Config{}), do: nil
+
+  defp authorization_response_iss_parameter_supported(%Config{
+         authorization_response_iss: true
+       }),
+       do: true
+
+  defp authorization_response_iss_parameter_supported(%Config{}), do: nil
 
   # RFC 7009 §2 / RFC 8414 §2 `revocation_endpoint`: the revocation endpoint
   # (`AttestoPhoenix.Controller.RevocationController`) is always mounted by the
