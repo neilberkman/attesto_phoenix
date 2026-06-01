@@ -6,6 +6,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.11] - 2026-06-01
+
+### Fixed
+
+- Resolve PAR `request_uri` references non-destructively at the authorization
+  endpoint, so host login or consent re-entry can complete without consuming the
+  pushed request before authorization-code issuance.
+
+### Changed
+
+- Add `AttestoPhoenix.PARStore.fetch/1` for authorization-endpoint resolution.
+  Existing custom stores that only implement `take/1` still work through a
+  compatibility fallback, but new stores should implement `fetch/1`.
+
 ## [0.6.10] - 2026-06-01
 
 ### Fixed

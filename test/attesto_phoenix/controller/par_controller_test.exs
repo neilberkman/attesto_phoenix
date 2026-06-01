@@ -38,6 +38,14 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
     end
 
     @impl true
+    def fetch(request_uri) do
+      case :ets.lookup(@table, request_uri) do
+        [{^request_uri, params, _ttl}] -> {:ok, params}
+        [] -> :error
+      end
+    end
+
+    @impl true
     def take(request_uri) do
       case :ets.take(@table, request_uri) do
         [{^request_uri, params, _ttl}] -> {:ok, params}

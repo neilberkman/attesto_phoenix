@@ -233,6 +233,31 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
       assert is_binary(query["code"])
       assert query["state"] == "xyz"
     end
+
+    test "does not consume a PAR request_uri before host re-entry completes" do
+      request_uri = "urn:ietf:params:oauth:request_uri:reentry"
+
+      put_config(
+        require_pushed_authorization_requests: true,
+        par_store: PARStore
+      )
+
+      :ok = PARStore.put(request_uri, valid_params(), 60)
+
+      first = call(%{"client_id" => @client_id, "request_uri" => request_uri})
+      second = call(%{"client_id" => @client_id, "request_uri" => request_uri})
+
+      assert first.status == 302
+      assert second.status == 302
+
+      first_query = first |> location_query()
+      second_query = second |> location_query()
+
+      assert is_binary(first_query["code"])
+      assert is_binary(second_query["code"])
+      refute first_query["error"]
+      refute second_query["error"]
+    end
   end
 
   # ── Direct (non-redirectable) errors (OIDC Core §3.1.2.6) ─────────────────

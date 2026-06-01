@@ -225,7 +225,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
         {params, false}
 
       store ->
-        case store.take(request_uri) do
+        case fetch_par_request(store, request_uri) do
           {:ok, stored} -> {Map.merge(params, stored) |> Map.delete("request_uri"), true}
           :error -> {params, false}
         end
@@ -233,6 +233,14 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
   end
 
   defp resolve_request_uri(_config, params), do: {params, false}
+
+  defp fetch_par_request(store, request_uri) do
+    cond do
+      function_exported?(store, :fetch, 1) -> store.fetch(request_uri)
+      function_exported?(store, :take, 1) -> store.take(request_uri)
+      true -> :error
+    end
+  end
 
   defp require_par_if_configured(config, request, false) do
     if config_flag(config, :require_pushed_authorization_requests) do
