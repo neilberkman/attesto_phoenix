@@ -207,6 +207,15 @@ The extractor returns `{:ok, :bearer, token}`, `{:ok, :dpop, token}`, or
 `:missing`. Attesto still verifies the token through the same JWT/DPoP/mTLS
 path; the cookie format and CSRF policy remain host concerns.
 
+### Req DPoP clients
+
+`attesto_phoenix` is the server-side Phoenix layer. If you also use
+[`Req`](https://hex.pm/packages/req) for OAuth clients in tests or internal
+tooling, [`req_dpop`](https://hex.pm/packages/req_dpop) generates RFC 9449 DPoP
+proofs that interoperate with `AttestoPhoenix.Plug.Authenticate`. It is not a
+runtime dependency of this package; `attesto_phoenix` uses it only in tests as
+an external client compatibility check.
+
 ## Database migration
 
 The library owns four operational tables backing the attesto store behaviours:
