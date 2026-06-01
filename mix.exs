@@ -107,11 +107,13 @@ defmodule AttestoPhoenix.MixProject do
         "guides/proxy_canonical_host.md",
         "guides/replay_nonce_production.md",
         "guides/error_envelope.md",
+        "notebooks/attesto_phoenix_demo.livemd",
         "CHANGELOG.md",
         "LICENSE"
       ],
       groups_for_extras: [
         Guides: ~r/guides\/.*/,
+        Notebooks: ~r/notebooks\/.*/,
         Changelog: ~r/CHANGELOG\.md/,
         License: ~r/LICENSE/
       ],
@@ -166,7 +168,7 @@ defmodule AttestoPhoenix.MixProject do
         "Changelog" => "https://hexdocs.pm/attesto_phoenix/changelog.html",
         "GitHub" => @url
       },
-      files: ~w(lib guides LICENSE mix.exs README.md CHANGELOG.md)
+      files: ~w(lib guides notebooks LICENSE mix.exs README.md CHANGELOG.md)
     ]
   end
 end

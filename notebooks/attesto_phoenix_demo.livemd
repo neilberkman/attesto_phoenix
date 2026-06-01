@@ -1,0 +1,260 @@
+# AttestoPhoenix Live Demo
+
+This notebook starts a tiny Phoenix router under Bandit, wires
+`AttestoPhoenix.Plug.Authenticate`, mints an Attesto access token, and calls the
+protected route with [`Req`](https://hex.pm/packages/req) plus
+[`ReqDPoP`](https://hex.pm/packages/req_dpop). It is a self-contained demo of
+the resource-server side of `attesto_phoenix`.
+
+For a production authorization server, use the installer and migrations from the
+README:
+
+```bash
+mix attesto_phoenix.install
+mix attesto_phoenix.gen.migration --repo MyApp.Repo
+mix ecto.migrate
+```
+
+## Install packages
+
+```elixir
+Mix.install([
+  {:attesto_phoenix, "~> 0.6"},
+  {:req, "~> 0.5"},
+  {:req_dpop, "~> 0.5"},
+  {:bandit, "~> 1.0"},
+  {:phoenix, "~> 1.7"}
+])
+```
+
+## Configure a demo issuer
+
+```elixir
+defmodule DemoKeystore do
+  @behaviour Attesto.Keystore
+
+  @impl true
+  def signing_pem do
+    :persistent_term.get({__MODULE__, :signing_pem})
+  end
+
+  @impl true
+  def verification_pems, do: [signing_pem()]
+end
+
+signing_pem =
+  JOSE.JWK.generate_key({:rsa, 2048})
+  |> JOSE.JWK.to_pem()
+  |> elem(1)
+
+:persistent_term.put({DemoKeystore, :signing_pem}, signing_pem)
+
+principal_kind =
+  Attesto.PrincipalKind.new("user", "usr_",
+    required_claims: [{"client_id", :non_empty_string}]
+  )
+
+demo_port = 4057 + :rand.uniform(1000)
+demo_base_url = "https://localhost:#{demo_port}"
+
+attesto_phoenix_config =
+  AttestoPhoenix.Config.new(
+    issuer: "https://issuer.example",
+    audience: "https://issuer.example",
+    keystore: DemoKeystore,
+    repo: DemoRepo,
+    load_client: fn _client_id -> {:error, :not_found} end,
+    verify_client_secret: fn _client, _secret -> false end,
+    load_principal: fn subject -> {:ok, %{subject: subject, role: :demo}} end,
+    principal_kinds: [principal_kind],
+    # Demo-only: production deployments should use a shared replay store.
+    replay_check: fn _jti, _ttl_seconds -> :ok end,
+    # Demo-only: pin the canonical DPoP htu to the HTTPS route the notebook
+    # calls. Attesto rejects DPoP proofs over plain HTTP.
+    htu: fn _conn -> demo_base_url <> "/api/protected" end,
+    require_https: false
+  )
+
+attesto_config =
+  AttestoPhoenix.Config.to_attesto_config(attesto_phoenix_config,
+    principal_kinds: [principal_kind]
+  )
+```
+
+## Start a Phoenix router
+
+```elixir
+defmodule DemoProtectedPlug do
+  import Plug.Conn
+
+  def init(opts), do: opts
+
+  def call(conn, _opts) do
+    body =
+      JSON.encode!(%{
+        ok: true,
+        subject: conn.assigns.attesto_context.subject,
+        scopes: conn.assigns.attesto_context.scope,
+        sender: conn.assigns.attesto_context.cnf
+      })
+
+    conn
+    |> put_resp_content_type("application/json")
+    |> send_resp(200, body)
+  end
+end
+
+defmodule DemoRouter do
+  use Phoenix.Router
+
+  pipeline :protected do
+    plug :authenticate
+  end
+
+  scope "/api" do
+    pipe_through :protected
+
+    forward "/protected", DemoProtectedPlug
+  end
+
+  defp authenticate(conn, _opts) do
+    AttestoPhoenix.Plug.Authenticate.call(conn,
+      config: :persistent_term.get({__MODULE__, :attesto_phoenix_config})
+    )
+  end
+end
+
+:persistent_term.put({DemoRouter, :attesto_phoenix_config}, attesto_phoenix_config)
+
+demo_cert = """
+-----BEGIN CERTIFICATE-----
+MIIDJTCCAg2gAwIBAgIUFLbDT772+NFb8cCLTfCDZl9JpakwDQYJKoZIhvcNAQEL
+BQAwFDESMBAGA1UEAwwJbG9jYWxob3N0MB4XDTI2MDYwMTE1MzU1NVoXDTM2MDUy
+OTE1MzU1NVowFDESMBAGA1UEAwwJbG9jYWxob3N0MIIBIjANBgkqhkiG9w0BAQEF
+AAOCAQ8AMIIBCgKCAQEArlmQZs4lSmc9nR4bXY66eHhGJAauXg0KIJdHuELgEljh
+FXiOL/sq1LlYOC2H/BbySRBM/T/eIkV0g0akbI1VMQjvPcLhW61+fpLi+ZgaqNuF
+5lD0UMBXmYhmK0jgbPt7z9d08afLosoMtwaTxHjIsge/8or4g3jZFmj4Rr423NXC
+iBTz1Gqz3i2Jy/40PdXLXV5gajj+zjVmSQa/U8j3IfCrogV66cySH4uexqX08Mko
+K5NuPkVLcTAQMSAGJt6S4Tcfj6MnemT7Bh1X9m7EJY8ByfnNMA4hnBhvVRNo2VHL
+R+DgW0aS9ehPxex05c7UERB5SiAYcn8I2w/E+2/BswIDAQABo28wbTAdBgNVHQ4E
+FgQUzXf4IUctWzPAZr0a9yFocESuOoowHwYDVR0jBBgwFoAUzXf4IUctWzPAZr0a
+9yFocESuOoowDwYDVR0TAQH/BAUwAwEB/zAaBgNVHREEEzARgglsb2NhbGhvc3SH
+BH8AAAEwDQYJKoZIhvcNAQELBQADggEBAHIX+wh1tvoOhcvLfqIJsuBD5kaaNLxh
+xR75kL/F9wjHvOklDTjWoCXeiUXLdGh4CWWP4Rif+eOgyFyZ9cHS1w89nItuUX4X
+F9NV2ehIEIZkeA2vRfYH/kevbGEesSKUSrz+XnhsG703eqyz3RjBHqy+QLyccWw7
+qspfhvgMT1sLa5VId8rKvlr+79WYuE2A8T+l7Fs0TaYdAaFUyqwQJQ63yuGjYtIb
+gTOAFk4wzvcrTMRv+OgcFmzgiqsVOTuQArF4RBWiqViINQy9nM9hWgze6cNrH5Ol
+wmwxLJX31heatRpl0vgcaH+ScHrhwop4VmyBPYu1KrCkYYHpgshPEqU=
+-----END CERTIFICATE-----
+"""
+
+demo_key = """
+-----BEGIN PRIVATE KEY-----
+MIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCuWZBmziVKZz2d
+Hhtdjrp4eEYkBq5eDQogl0e4QuASWOEVeI4v+yrUuVg4LYf8FvJJEEz9P94iRXSD
+RqRsjVUxCO89wuFbrX5+kuL5mBqo24XmUPRQwFeZiGYrSOBs+3vP13Txp8uiygy3
+BpPEeMiyB7/yiviDeNkWaPhGvjbc1cKIFPPUarPeLYnL/jQ91ctdXmBqOP7ONWZJ
+Br9TyPch8KuiBXrpzJIfi57GpfTwySgrk24+RUtxMBAxIAYm3pLhNx+Poyd6ZPsG
+HVf2bsQljwHJ+c0wDiGcGG9VE2jZUctH4OBbRpL16E/F7HTlztQREHlKIBhyfwjb
+D8T7b8GzAgMBAAECggEACPu/n2YK/dgIw+O21tpxbGumEY0jYHoDhfjFgg6c3qHw
+8Kff8hD0lmlf/+UFfYCHk13Hpo535gQpVx14s2Jee8K3sQYtkaLq3AXtgNBmVagz
+ltGgOD9XRCeHCPJRJGYA0/Pu225US8FlZ+wEb4cmfPKkehBqPzvzoF5gP75+5sbD
+1ck2Rf0DBFbvoFR4ct3HSXv8YreTwQVg22IM5rX+3qW7+i4qiRUTVcbc+BuOsyHT
+e8HRdS9wHfb1tn75rP8YP/wNmowVicp198ZBbGrmCCn4cir44lBVlSDga/v/OazI
+ouP14xWmCJeE6GqXsDSxAm/qO94WGAoDWngxDs08YQKBgQDhEcjxuzz8Z1JEne2+
+JfRu9KhNeNr04GsTcimlRCZZNpl8SpzrGunww73RfEWZcU/9AF9GYyFdklyW3YCD
+aYe+g0bC64LiFE32vjL7hbvOQagco+36A8QOHZkI4Y2rLm6rAH598UjcGkXE7NaE
+5TiTaNP8ihVDlE7Dgo73Cn9NFwKBgQDGT2bukb4bT8WPeFom0IJnMycK+Y7LmMuy
+i+xsqwqSKk8pho1h1RnZm1GgfPp/Iz8r9V6zLpYX6kxPu3Z/tZQNJMjRzNCh3ize
+Y0BU1qA3V1Eqs+NSj1u7n7qY96UoCmiupaYCihwTTKC7Ah9Uh0KGeEDdI1x/nbXd
+x/M5fN1pxQKBgQCctENSe2lE27Nd7w+eutJrhpDAEAtzP+WNjokMdly09Nz8uv5y
+ezSy27aH6pyS72Af6Whsm4yZl9Q7flGCLbHDpadZA50HR9fYmijpEv3l57Ti7Ag/
+cOvKYDUzB8gZjaSkDx4DFkICbZByQexCb05q5Cvkw0d23AXS/k4IFxj3VQKBgC+0
+KAmZi4acYOTLSbxuif/zQSAVujDlt5JisGPPnUJd5R8TG+19yrMa9r7JcaSlwOt9
+IeOugDKOjP7dFHtSHaQvxhMZ1tIpVNfGPlJqMq49VewUy8kvbRysJsHnSJZiMp5Y
+gJ+5w1ktJLj3oLu/sdQRF2FawUR9lqMcFzkr/UMVAoGAXJQJD3hZ1EKuNKChkNDf
+py0Yr+uhbOs4GzTD2jqVp50Bg2qjvF1IAf8oBA8UaFAVCTtY+MFpYQAMQEWurU8/
+7jgK/vrU3vGF53FucsKSf9UdkODlFXM9KTee42OenSQNsaDyXn/SbHdPN8uZeis5
+0fJLvmUodnzxuv1r7N1RDaU=
+-----END PRIVATE KEY-----
+"""
+
+certfile = Path.join(System.tmp_dir!(), "attesto_phoenix_demo_cert.pem")
+keyfile = Path.join(System.tmp_dir!(), "attesto_phoenix_demo_key.pem")
+File.write!(certfile, demo_cert)
+File.write!(keyfile, demo_key)
+
+{:ok, _server} =
+  Bandit.start_link(
+    plug: DemoRouter,
+    scheme: :https,
+    port: demo_port,
+    certfile: certfile,
+    keyfile: keyfile
+  )
+```
+
+## Mint a DPoP-bound token
+
+```elixir
+dpop_key = ReqDPoP.Key.generate(:es256)
+dpop_jkt = ReqDPoP.Key.thumbprint(dpop_key)
+
+principal = %{
+  kind: "user",
+  sub: "usr_demo_123",
+  scopes: ["openid", "read:demo"],
+  claims: %{"client_id" => "demo-client"}
+}
+
+{:ok, minted} = Attesto.Token.mint(attesto_config, principal, dpop_jkt: dpop_jkt)
+
+minted.token_type
+```
+
+## Call the protected route with Req + ReqDPoP
+
+```elixir
+client =
+  Req.new(
+    base_url: demo_base_url,
+    connect_options: [transport_opts: [verify: :verify_none]]
+  )
+  |> ReqDPoP.attach(key: dpop_key, access_token: minted.access_token)
+
+response = Req.get!(client, url: "/api/protected")
+
+{response.status, response.body}
+```
+
+Expected result:
+
+```text
+{200,
+ %{
+   "ok" => true,
+   "scopes" => ["openid", "read:demo"],
+   "sender" => %{"jkt" => ^dpop_jkt},
+   "subject" => "usr_demo_123"
+ }}
+```
+
+## Present the same token as Bearer
+
+A DPoP-bound token must not work as a plain Bearer token.
+
+```elixir
+bearer_response =
+  Req.get!(demo_base_url <> "/api/protected",
+    headers: [{"authorization", "Bearer " <> minted.access_token}],
+    connect_options: [transport_opts: [verify: :verify_none]]
+  )
+
+{bearer_response.status, bearer_response.body}
+```
+
+Expected result:
+
+```text
+{401, %{"error" => "invalid_token"}}
+```

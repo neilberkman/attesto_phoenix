@@ -1,5 +1,11 @@
 # AttestoPhoenix
 
+[![Hex.pm](https://img.shields.io/hexpm/v/attesto_phoenix)](https://hex.pm/packages/attesto_phoenix)
+[![Hexdocs.pm](https://img.shields.io/badge/docs-hexdocs.pm-blue)](https://hexdocs.pm/attesto_phoenix)
+[![Elixir CI](https://github.com/XukuLLC/attesto_phoenix/actions/workflows/elixir.yml/badge.svg)](https://github.com/XukuLLC/attesto_phoenix/actions/workflows/elixir.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green)](https://github.com/XukuLLC/attesto_phoenix/blob/main/LICENSE)
+[![Elixir](https://img.shields.io/badge/elixir-%E2%89%A5%201.18-purple)](https://elixir-lang.org)
+
 An opinionated Phoenix/Ecto OAuth 2.0 / OIDC authorization server on top of
 [attesto](https://hex.pm/packages/attesto).
 
@@ -37,8 +43,20 @@ supplied through a small set of neutral configuration callbacks.
 | Client registry, principals, keys, audit | no | supplied via callbacks |
 
 If you only need the protocol primitives and want to build your own transport,
-depend on `attesto` directly. If you want a batteries-mostly-included Phoenix
-server, use `attesto_phoenix`.
+depend on `attesto` directly. If you want a batteries-included Phoenix
+authorization server, use `attesto_phoenix`.
+
+## Contents
+
+- [Installation](#installation)
+- [Quick start](#quick-start)
+- [Configuration](#configuration)
+- [Mounting the routes](#mounting-the-routes)
+- [Protecting resources](#protecting-resources)
+- [Database migration](#database-migration)
+- [Guides and examples](#guides-and-examples)
+- [Development](#development)
+- [License](#license)
 
 ## Installation
 
@@ -51,6 +69,42 @@ def deps do
   ]
 end
 ```
+
+The optional Igniter installer needs `igniter` available while you run it. It is
+not a runtime dependency of this package:
+
+```elixir
+def deps do
+  [
+    {:attesto_phoenix, "~> 0.6"},
+    {:igniter, "~> 0.5", only: [:dev], runtime: false}
+  ]
+end
+```
+
+## Quick start
+
+For a new Phoenix app, start with the installer. It is idempotent and writes the
+host-owned callback modules as stubs rather than guessing your client registry,
+principal model, or authorization policy.
+
+```bash
+mix deps.get
+mix attesto_phoenix.install
+mix attesto_phoenix.gen.migration --repo MyApp.Repo
+mix ecto.migrate
+```
+
+Use `--oauth-path-prefix` when the OAuth endpoints should not live under
+`/oauth`:
+
+```bash
+mix attesto_phoenix.install --oauth-path-prefix /mcp/oauth
+```
+
+After the installer runs, fill in the generated callback modules and configure a
+keystore. The rest of this README shows the same pieces explicitly so you can
+review what the installer generated or wire them by hand.
 
 ## Configuration
 
@@ -239,6 +293,29 @@ mix ecto.migrate
 Single-node deployments may skip the Ecto nonce/replay tables and wire
 attesto's in-memory ETS implementations via `:nonce_store` and `:replay_check`;
 the Ecto variants exist for clustered correctness.
+
+## Guides and examples
+
+- [Example configurations](guides/examples.md) - confidential and public-client
+  configuration sketches.
+- [Consumer migration](guides/consumer_migration.md) - moving from a custom or
+  legacy OAuth route surface while keeping historical migrations compiling.
+- [Proxy and canonical host](guides/proxy_canonical_host.md) - issuer,
+  forwarded header, and HTTPS behavior behind proxies/CDNs.
+- [Replay and nonce production notes](guides/replay_nonce_production.md) -
+  shared-store requirements for clustered DPoP replay and nonce handling.
+- [Error envelope hooks](guides/error_envelope.md) - using `:send_error` and
+  related callbacks to keep a host application's API error format.
+- [Livebook demo](notebooks/attesto_phoenix_demo.livemd) - a self-contained
+  Phoenix/Bandit resource-server demo using `Req` + `req_dpop`.
+
+## Development
+
+```bash
+mix deps.get
+mix precommit
+mix test --include ecto   # requires Postgres
+```
 
 ## License
 
