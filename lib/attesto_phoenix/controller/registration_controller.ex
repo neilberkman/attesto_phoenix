@@ -121,6 +121,11 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
   # through to the host store.
   @string_array_metadata ~w(contacts)
 
+  # RFC 7591 §2 `jwks`: the client's inline public JWK Set. It is carried
+  # through to the host store so authorization and token endpoints can verify
+  # request objects and private_key_jwt assertions without resolving jwks_uri.
+  @map_metadata ~w(jwks)
+
   @doc """
   Dynamic client registration action (RFC 7591 §3.1).
 
@@ -261,7 +266,8 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
   # with the shape it must satisfy.
   defp passthrough_specs do
     Enum.map(@display_string_metadata, &{&1, :string}) ++
-      Enum.map(@string_array_metadata, &{&1, :string_array})
+      Enum.map(@string_array_metadata, &{&1, :string_array}) ++
+      Enum.map(@map_metadata, &{&1, :map})
   end
 
   defp validate_passthrough_member(metadata, key, kind) do
@@ -288,6 +294,12 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
 
   defp validate_passthrough_value(key, :string_array, _value) do
     {:error, error(@error_invalid_client_metadata, "#{key} must be an array (RFC 7591 §2)")}
+  end
+
+  defp validate_passthrough_value(_key, :map, value) when is_map(value), do: {:ok, value}
+
+  defp validate_passthrough_value(key, :map, _value) do
+    {:error, error(@error_invalid_client_metadata, "#{key} must be an object (RFC 7591 §2)")}
   end
 
   # RFC 7591 §2 / RFC 6749 §2.3.1: the token-endpoint auth method must be one

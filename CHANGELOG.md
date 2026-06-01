@@ -6,6 +6,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.6] - 2026-06-01
+
+### Fixed
+
+- Dynamic client registration now preserves inline `jwks` metadata (RFC 7591
+  §2) and hands it to the host `:register_client` callback. Hosts can then
+  return those keys through `:client_jwks` for request-object and
+  `private_key_jwt` verification.
+
 ## [0.6.5] - 2026-06-01
 
 ### Fixed

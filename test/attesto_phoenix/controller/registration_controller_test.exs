@@ -160,7 +160,8 @@ defmodule AttestoPhoenix.Controller.RegistrationControllerTest do
           "logo_uri" => "https://acme.example/logo.png",
           "tos_uri" => "https://acme.example/tos",
           "policy_uri" => "https://acme.example/privacy",
-          "contacts" => ["ops@acme.example"]
+          "contacts" => ["ops@acme.example"],
+          "jwks" => %{"keys" => [%{"kty" => "RSA", "kid" => "client-key"}]}
         })
 
       payload = body(conn)
@@ -172,10 +173,12 @@ defmodule AttestoPhoenix.Controller.RegistrationControllerTest do
       assert payload["tos_uri"] == "https://acme.example/tos"
       assert payload["policy_uri"] == "https://acme.example/privacy"
       assert payload["contacts"] == ["ops@acme.example"]
+      assert payload["jwks"] == %{"keys" => [%{"kty" => "RSA", "kid" => "client-key"}]}
 
       assert_receive {:persisted, attrs}
       assert attrs["client_name"] == "Acme MCP"
       assert attrs["contacts"] == ["ops@acme.example"]
+      assert attrs["jwks"] == %{"keys" => [%{"kty" => "RSA", "kid" => "client-key"}]}
     end
 
     test "drops unknown fields and never hands them to the host store" do
@@ -249,6 +252,17 @@ defmodule AttestoPhoenix.Controller.RegistrationControllerTest do
         post_register(config([]), %{
           "grant_types" => ["client_credentials"],
           "contacts" => "ops@acme.example"
+        })
+
+      assert conn.status == 400
+      assert body(conn)["error"] == "invalid_client_metadata"
+    end
+
+    test "rejects a malformed inline jwks member" do
+      conn =
+        post_register(config([]), %{
+          "grant_types" => ["client_credentials"],
+          "jwks" => ["not", "an", "object"]
         })
 
       assert conn.status == 400
