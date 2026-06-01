@@ -58,8 +58,6 @@ defmodule AttestoPhoenix.MixProject do
       # Plug behaviours for the protected-resource plugs (also a Phoenix
       # transitive dependency).
       {:plug, "~> 1.15"},
-      # JSON encoding for token/discovery/JWKS responses.
-      {:jason, "~> 1.4"},
       # `mix attesto_phoenix.install` (Mix.Tasks.AttestoPhoenix.Install) is an
       # upgrade-aware Igniter installer: it inspects the host's config and router
       # and applies idempotent patches. Declared `optional: true` so the runtime

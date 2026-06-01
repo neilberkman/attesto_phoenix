@@ -212,7 +212,7 @@ defmodule AttestoPhoenix.Controller.RevocationControllerTest do
       conn = RevocationController.create(build_conn(params, []), params)
 
       assert conn.status == 401
-      assert Jason.decode!(conn.resp_body)["error"] == "invalid_client"
+      assert JSON.decode!(conn.resp_body)["error"] == "invalid_client"
       assert get_resp_header(conn, "www-authenticate") == ["Basic"]
     end
 
@@ -226,7 +226,7 @@ defmodule AttestoPhoenix.Controller.RevocationControllerTest do
       conn = RevocationController.create(build_conn(params, []), params)
 
       assert conn.status == 401
-      assert Jason.decode!(conn.resp_body)["error"] == "invalid_client"
+      assert JSON.decode!(conn.resp_body)["error"] == "invalid_client"
     end
 
     test "no client credentials at all is invalid_client (401)" do
@@ -235,7 +235,7 @@ defmodule AttestoPhoenix.Controller.RevocationControllerTest do
       conn = RevocationController.create(build_conn(params, []), params)
 
       assert conn.status == 401
-      assert Jason.decode!(conn.resp_body)["error"] == "invalid_client"
+      assert JSON.decode!(conn.resp_body)["error"] == "invalid_client"
     end
 
     test "malformed Basic credential is invalid_client (401), no body fallback" do
@@ -251,7 +251,7 @@ defmodule AttestoPhoenix.Controller.RevocationControllerTest do
         |> RevocationController.create(params)
 
       assert conn.status == 401
-      assert Jason.decode!(conn.resp_body)["error"] == "invalid_client"
+      assert JSON.decode!(conn.resp_body)["error"] == "invalid_client"
     end
   end
 
@@ -265,7 +265,7 @@ defmodule AttestoPhoenix.Controller.RevocationControllerTest do
       conn = RevocationController.create(build_conn(params, []), params)
 
       assert conn.status == 400
-      assert Jason.decode!(conn.resp_body)["error"] == "invalid_request"
+      assert JSON.decode!(conn.resp_body)["error"] == "invalid_request"
     end
 
     test "empty token parameter is invalid_request (400)" do
@@ -278,7 +278,7 @@ defmodule AttestoPhoenix.Controller.RevocationControllerTest do
       conn = RevocationController.create(build_conn(params, []), params)
 
       assert conn.status == 400
-      assert Jason.decode!(conn.resp_body)["error"] == "invalid_request"
+      assert JSON.decode!(conn.resp_body)["error"] == "invalid_request"
     end
   end
 

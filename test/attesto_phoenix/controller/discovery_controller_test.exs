@@ -57,7 +57,7 @@ defmodule AttestoPhoenix.Controller.DiscoveryControllerTest do
     |> DiscoveryController.show(%{})
   end
 
-  defp decode_body(conn), do: Jason.decode!(conn.resp_body)
+  defp decode_body(conn), do: JSON.decode!(conn.resp_body)
 
   describe "show/2" do
     test "renders the RFC 8414 protocol members as JSON" do

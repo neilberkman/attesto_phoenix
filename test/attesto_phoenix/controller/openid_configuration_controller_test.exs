@@ -63,7 +63,7 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationControllerTest do
     |> OpenIDConfigurationController.show(%{})
   end
 
-  defp decode_body(conn), do: Jason.decode!(conn.resp_body)
+  defp decode_body(conn), do: JSON.decode!(conn.resp_body)
 
   describe "show/2" do
     test "renders the required OIDC Provider Metadata fields as JSON" do

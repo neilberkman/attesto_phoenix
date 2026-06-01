@@ -64,7 +64,7 @@ defmodule AttestoPhoenix.Controller.RegistrationControllerTest do
     RegistrationController.delete(conn, %{"client_id" => client_id})
   end
 
-  defp body(conn), do: Jason.decode!(conn.resp_body)
+  defp body(conn), do: JSON.decode!(conn.resp_body)
 
   describe "successful registration (RFC 7591 §3.2.1)" do
     test "registers a confidential client and returns 201 with credentials" do

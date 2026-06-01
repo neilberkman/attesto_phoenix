@@ -66,7 +66,7 @@ defmodule AttestoPhoenix.Controller.JWKSControllerTest do
     |> JWKSController.show(%{})
   end
 
-  defp body(conn), do: Jason.decode!(conn.resp_body)
+  defp body(conn), do: JSON.decode!(conn.resp_body)
 
   describe "show/2" do
     test "renders one public JWK per verification key (RFC 7517 §5)" do

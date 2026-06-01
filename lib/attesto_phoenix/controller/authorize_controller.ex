@@ -597,7 +597,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
       |> send_resp(:bad_request, direct_error_html(description))
     else
       body =
-        Jason.encode!(%{
+        JSON.encode!(%{
           error: "invalid_request",
           error_description: description
         })

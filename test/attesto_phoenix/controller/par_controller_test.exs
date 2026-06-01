@@ -88,7 +88,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
       |> PARController.create(params)
 
     assert conn.status == 201
-    body = Jason.decode!(conn.resp_body)
+    body = JSON.decode!(conn.resp_body)
     assert body["expires_in"] == 45
     assert body["request_uri"] =~ "urn:ietf:params:oauth:request_uri:"
 
@@ -116,7 +116,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
       |> PARController.create(params)
 
     assert conn.status == 201
-    body = Jason.decode!(conn.resp_body)
+    body = JSON.decode!(conn.resp_body)
     assert {:ok, stored, 45} = PARStore.lookup(body["request_uri"])
     assert stored["client_id"] == "confidential-1"
     refute Map.has_key?(stored, "client_assertion")
@@ -137,7 +137,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
       |> PARController.create(params)
 
     assert conn.status == 400
-    assert Jason.decode!(conn.resp_body)["error"] == "invalid_request"
+    assert JSON.decode!(conn.resp_body)["error"] == "invalid_request"
   end
 
   test "rejects unknown clients without revealing existence" do
@@ -149,7 +149,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
       |> PARController.create(params)
 
     assert conn.status == 400
-    body = Jason.decode!(conn.resp_body)
+    body = JSON.decode!(conn.resp_body)
     assert body["error"] == "invalid_client"
     assert body["error_description"] == "client authentication failed"
   end

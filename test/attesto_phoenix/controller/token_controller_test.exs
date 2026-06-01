@@ -1216,7 +1216,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
     |> TokenController.create(params)
   end
 
-  defp body(conn), do: Jason.decode!(conn.resp_body)
+  defp body(conn), do: JSON.decode!(conn.resp_body)
 
   defp client_assertion(jwk, client_id, overrides \\ %{}) do
     now = System.system_time(:second)
