@@ -10,6 +10,10 @@ defmodule AttestoPhoenix.Controller.JWKSControllerTest do
   alias AttestoPhoenix.Config
   alias AttestoPhoenix.Controller.JWKSController
 
+  @principal_kind Attesto.PrincipalKind.new("user", "user:",
+                    required_claims: [{"sub", :non_empty_string}]
+                  )
+
   # The configured AttestoPhoenix.Config is read from conn.private under this
   # key by the controller (placed there by the host pipeline in production).
   @config_key :attesto_phoenix_config
@@ -30,6 +34,13 @@ defmodule AttestoPhoenix.Controller.JWKSControllerTest do
     @impl true
     def verification_pems, do: pems()
 
+    @impl true
+    def key_algs do
+      :attesto_phoenix
+      |> Application.fetch_env!(__MODULE__)
+      |> Keyword.get(:key_algs, %{})
+    end
+
     defp pems do
       :attesto_phoenix
       |> Application.fetch_env!(__MODULE__)
@@ -45,14 +56,22 @@ defmodule AttestoPhoenix.Controller.JWKSControllerTest do
     |> elem(1)
   end
 
-  defp build_config(verification_pems) do
-    Application.put_env(:attesto_phoenix, TestKeystore, verification_pems: verification_pems)
+  defp build_config(verification_pems, opts \\ []) do
+    Application.put_env(
+      :attesto_phoenix,
+      TestKeystore,
+      verification_pems: verification_pems,
+      key_algs: Keyword.get(opts, :key_algs, %{})
+    )
+
     on_exit(fn -> Application.delete_env(:attesto_phoenix, TestKeystore) end)
 
     Config.new(
       issuer: "https://issuer.example",
+      audience: "https://issuer.example",
       keystore: TestKeystore,
       repo: __MODULE__.Repo,
+      principal_kinds: [@principal_kind],
       load_client: fn _ -> {:error, :not_found} end,
       verify_client_secret: fn _, _ -> false end,
       load_principal: fn _ -> {:error, :not_found} end
@@ -81,6 +100,14 @@ defmodule AttestoPhoenix.Controller.JWKSControllerTest do
       assert is_binary(jwk["kid"])
       assert is_binary(jwk["n"])
       assert is_binary(jwk["e"])
+    end
+
+    test "preserves per-key algorithm metadata from the keystore" do
+      pem = gen_pem()
+      kid = Attesto.Key.kid(pem)
+      conn = call_show(build_config([pem], key_algs: %{kid => "PS256"}))
+
+      assert %{"keys" => [%{"kid" => ^kid, "alg" => "PS256"}]} = body(conn)
     end
 
     test "publishes only public key material (RFC 7517 §1)" do

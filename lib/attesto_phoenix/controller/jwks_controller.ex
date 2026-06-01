@@ -60,11 +60,9 @@ defmodule AttestoPhoenix.Controller.JWKSController do
   def show(conn, _params) do
     config = fetch_config!(conn)
 
-    # `Attesto.JWKS.from_config/1` is `from_pems/1` over the keystore's
-    # verification PEMs; calling `from_pems/1` here publishes exactly that set
-    # without constructing the claim-level protocol config (issuer, audience,
-    # principal kinds), which a key-set document does not need.
-    jwk_set = JWKS.from_pems(config.keystore.verification_pems())
+    # Keep the published key metadata aligned with the token signing path:
+    # `from_config/1` preserves the keystore's per-key `alg` metadata.
+    jwk_set = JWKS.from_config(attesto_config(config))
 
     conn
     |> put_public_cache()
@@ -89,4 +87,30 @@ defmodule AttestoPhoenix.Controller.JWKSController do
                 "in conn.private[#{inspect(@config_key)}]; wire the host pipeline that assigns it"
     end
   end
+
+  defp attesto_config(config) do
+    Config.to_attesto_config(config, principal_kinds_extra(config))
+  end
+
+  defp principal_kinds_extra(%Config{principal_kinds: kinds})
+       when is_list(kinds) and kinds != [] do
+    [principal_kinds: kinds]
+  end
+
+  defp principal_kinds_extra(%Config{principal_kinds: callback}) when not is_nil(callback) do
+    case invoke(callback, []) do
+      kinds when is_list(kinds) and kinds != [] -> [principal_kinds: kinds]
+      _other -> []
+    end
+  end
+
+  defp principal_kinds_extra(_config), do: []
+
+  defp invoke(fun, args) when is_function(fun), do: apply(fun, args)
+
+  defp invoke({module, fun}, args) when is_atom(module) and is_atom(fun),
+    do: apply(module, fun, args)
+
+  defp invoke({module, fun, extra}, args) when is_atom(module) and is_atom(fun),
+    do: apply(module, fun, args ++ extra)
 end

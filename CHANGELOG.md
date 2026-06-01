@@ -6,6 +6,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.12] - 2026-06-01
+
+### Fixed
+
+- Preserve keystore-provided per-key `alg` metadata in the JWKS endpoint. This
+  keeps FAPI deployments that sign ID tokens with `PS256` from advertising the
+  same key as `RS256`.
+
 ## [0.6.11] - 2026-06-01
 
 ### Fixed
