@@ -234,6 +234,26 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationControllerTest do
       assert body["registration_endpoint"] == "#{@issuer}/oauth/register"
     end
 
+    test "advertises endpoint URLs under a custom :oauth_path_prefix" do
+      host =
+        host_config(
+          oauth_path_prefix: "/mcp/oauth",
+          registration_enabled: true,
+          register_client: fn _ -> {:error, :unsupported} end
+        )
+
+      body = call_show(host, protocol_config()) |> decode_body()
+
+      assert body["revocation_endpoint"] == "#{@issuer}/mcp/oauth/revoke"
+      assert body["pushed_authorization_request_endpoint"] == "#{@issuer}/mcp/oauth/par"
+      assert body["registration_endpoint"] == "#{@issuer}/mcp/oauth/register"
+      # authorization_endpoint / userinfo_endpoint stay host-supplied and are
+      # not relocated by the prefix.
+      assert body["authorization_endpoint"] == @authorization_endpoint
+      assert body["userinfo_endpoint"] == @userinfo_endpoint
+      assert body["jwks_uri"] == "#{@issuer}/.well-known/jwks.json"
+    end
+
     test "marks the response publicly cacheable (OIDC Discovery §4)" do
       conn = call_show(host_config(), protocol_config())
 

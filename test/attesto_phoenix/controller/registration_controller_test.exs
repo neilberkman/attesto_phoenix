@@ -92,6 +92,21 @@ defmodule AttestoPhoenix.Controller.RegistrationControllerTest do
                "https://issuer.example/oauth/register/" <> payload["client_id"]
     end
 
+    test "registration_client_uri follows a custom :oauth_path_prefix (RFC 7592 §2)" do
+      conn =
+        post_register(config(oauth_path_prefix: "/mcp/oauth"), %{
+          "grant_types" => ["authorization_code"],
+          "redirect_uris" => ["https://client.example/callback"]
+        })
+
+      payload = body(conn)
+
+      assert conn.status == 201
+
+      assert payload["registration_client_uri"] ==
+               "https://issuer.example/mcp/oauth/register/" <> payload["client_id"]
+    end
+
     test "a public client (token_endpoint_auth_method none) is issued no secret" do
       conn =
         post_register(config([]), %{
@@ -121,6 +136,123 @@ defmodule AttestoPhoenix.Controller.RegistrationControllerTest do
 
       assert get_resp_header(conn, "cache-control") == ["no-store"]
       assert get_resp_header(conn, "pragma") == ["no-cache"]
+    end
+  end
+
+  describe "RFC 7591 §2 metadata passthrough" do
+    test "carries known client-identity metadata through to the host store and response" do
+      test_pid = self()
+
+      config =
+        config(
+          register_client: fn attrs ->
+            send(test_pid, {:persisted, attrs})
+            {:ok, attrs}
+          end
+        )
+
+      conn =
+        post_register(config, %{
+          "grant_types" => ["authorization_code"],
+          "redirect_uris" => ["https://client.example/callback"],
+          "client_name" => "Acme MCP",
+          "client_uri" => "https://acme.example",
+          "logo_uri" => "https://acme.example/logo.png",
+          "tos_uri" => "https://acme.example/tos",
+          "policy_uri" => "https://acme.example/privacy",
+          "contacts" => ["ops@acme.example"]
+        })
+
+      payload = body(conn)
+
+      assert conn.status == 201
+      assert payload["client_name"] == "Acme MCP"
+      assert payload["client_uri"] == "https://acme.example"
+      assert payload["logo_uri"] == "https://acme.example/logo.png"
+      assert payload["tos_uri"] == "https://acme.example/tos"
+      assert payload["policy_uri"] == "https://acme.example/privacy"
+      assert payload["contacts"] == ["ops@acme.example"]
+
+      assert_receive {:persisted, attrs}
+      assert attrs["client_name"] == "Acme MCP"
+      assert attrs["contacts"] == ["ops@acme.example"]
+    end
+
+    test "drops unknown fields and never hands them to the host store" do
+      test_pid = self()
+
+      config =
+        config(
+          register_client: fn attrs ->
+            send(test_pid, {:persisted, attrs})
+            {:ok, attrs}
+          end
+        )
+
+      conn =
+        post_register(config, %{
+          "grant_types" => ["authorization_code"],
+          "redirect_uris" => ["https://client.example/callback"],
+          "is_admin" => true,
+          "internal_trust_level" => "root"
+        })
+
+      payload = body(conn)
+
+      assert conn.status == 201
+      refute Map.has_key?(payload, "is_admin")
+      refute Map.has_key?(payload, "internal_trust_level")
+
+      assert_receive {:persisted, attrs}
+      refute Map.has_key?(attrs, "is_admin")
+      refute Map.has_key?(attrs, "internal_trust_level")
+    end
+
+    test "a passthrough member cannot override a protocol-critical member" do
+      test_pid = self()
+
+      config =
+        config(
+          register_client: fn attrs ->
+            send(test_pid, {:persisted, attrs})
+            {:ok, attrs}
+          end
+        )
+
+      # A request that also smuggles a redirect_uris-shaped client_name must
+      # not corrupt the validated redirect_uris.
+      conn =
+        post_register(config, %{
+          "grant_types" => ["authorization_code"],
+          "redirect_uris" => ["https://client.example/callback"],
+          "client_name" => "legit"
+        })
+
+      assert conn.status == 201
+      assert_receive {:persisted, attrs}
+      assert attrs["redirect_uris"] == ["https://client.example/callback"]
+    end
+
+    test "rejects a malformed known metadata member with invalid_client_metadata" do
+      conn =
+        post_register(config([]), %{
+          "grant_types" => ["client_credentials"],
+          "client_name" => 12_345
+        })
+
+      assert conn.status == 400
+      assert body(conn)["error"] == "invalid_client_metadata"
+    end
+
+    test "rejects a non-array contacts member" do
+      conn =
+        post_register(config([]), %{
+          "grant_types" => ["client_credentials"],
+          "contacts" => "ops@acme.example"
+        })
+
+      assert conn.status == 400
+      assert body(conn)["error"] == "invalid_client_metadata"
     end
   end
 

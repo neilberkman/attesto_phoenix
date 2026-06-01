@@ -213,35 +213,22 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
 
   # RFC 7009 §2 / RFC 8414 §2 `revocation_endpoint`: the revocation endpoint
   # (`AttestoPhoenix.Controller.RevocationController`) is always mounted by the
-  # router macro, so it is always advertised. The path is the
-  # protocol-conventional revocation path merged onto the issuer (the endpoint
-  # members are absolute URLs).
+  # router macro, so it is always advertised. The URL is resolved from the
+  # host's configured revocation path (the endpoint members are absolute URLs),
+  # so it reflects where the host mounted the endpoint.
   @spec revocation_endpoint(Config.t()) :: String.t()
-  defp revocation_endpoint(%Config{issuer: issuer}) do
-    issuer
-    |> URI.parse()
-    |> URI.merge("/oauth/revoke")
-    |> URI.to_string()
-  end
+  defp revocation_endpoint(%Config{} = config), do: Config.revocation_endpoint_url(config)
 
-  defp pushed_authorization_request_endpoint(%Config{issuer: issuer}) do
-    issuer
-    |> URI.parse()
-    |> URI.merge("/oauth/par")
-    |> URI.to_string()
-  end
+  defp pushed_authorization_request_endpoint(%Config{} = config),
+    do: Config.par_endpoint_url(config)
 
   # RFC 7591 §3: advertise the dynamic client registration endpoint only when
-  # registration is enabled; otherwise omit the member entirely. The path is
-  # the protocol-conventional registration path merged onto the issuer (the
-  # endpoint members are absolute URLs).
+  # registration is enabled; otherwise omit the member entirely. The URL is
+  # resolved from the host's configured registration path (the endpoint members
+  # are absolute URLs), so it reflects where the host mounted the endpoint.
   @spec registration_endpoint(Config.t()) :: String.t() | nil
-  defp registration_endpoint(%Config{registration_enabled: true, issuer: issuer}) do
-    issuer
-    |> URI.parse()
-    |> URI.merge("/oauth/register")
-    |> URI.to_string()
-  end
+  defp registration_endpoint(%Config{registration_enabled: true} = config),
+    do: Config.registration_endpoint_url(config)
 
   defp registration_endpoint(%Config{registration_enabled: false}), do: nil
 

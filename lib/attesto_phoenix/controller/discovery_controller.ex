@@ -164,24 +164,17 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
     ]
   end
 
-  defp pushed_authorization_request_endpoint(%Config{issuer: issuer}) do
-    issuer
-    |> URI.parse()
-    |> URI.merge("/oauth/par")
-    |> URI.to_string()
-  end
+  defp pushed_authorization_request_endpoint(%Config{} = config),
+    do: Config.par_endpoint_url(config)
 
   # RFC 7591 §3: advertise the dynamic client registration endpoint only
-  # when registration is enabled; otherwise omit the member entirely. The
-  # path is the protocol-conventional registration path merged onto the
-  # issuer (RFC 8414 §2 endpoint members are absolute URLs).
+  # when registration is enabled; otherwise omit the member entirely. The URL
+  # is resolved from the host's configured registration path (RFC 8414 §2
+  # endpoint members are absolute URLs), so it reflects where the host mounted
+  # the endpoint rather than a hardcoded `/oauth/register`.
   @spec registration_endpoint(Config.t()) :: String.t() | nil
-  defp registration_endpoint(%Config{registration_enabled: true, issuer: issuer}) do
-    issuer
-    |> URI.parse()
-    |> URI.merge("/oauth/register")
-    |> URI.to_string()
-  end
+  defp registration_endpoint(%Config{registration_enabled: true} = config),
+    do: Config.registration_endpoint_url(config)
 
   defp registration_endpoint(%Config{registration_enabled: false}), do: nil
 

@@ -193,6 +193,53 @@ defmodule AttestoPhoenix.Config do
       sweeper is not started if unset.
     * `:table_prefix` - optional Ecto schema/table prefix for the generated
       tables.
+
+  ### Endpoint paths advertised in metadata
+
+  The discovery documents (RFC 8414 §3, OpenID Connect Discovery §4) and the
+  RFC 7591 §3.2.1 registration response advertise absolute endpoint URLs built
+  from the `:issuer` and the request path each endpoint is mounted at. By
+  default the OAuth endpoints live under `/oauth/*` (the historic surface), but
+  a host that mounts them elsewhere (for example under `/mcp/oauth/*` to avoid
+  colliding with a legacy provider) MUST advertise the paths it actually serves
+  or clients are misdirected. These keys control that, all additive with
+  defaults that reproduce the historic `/oauth/*` surface exactly:
+
+    * `:oauth_path_prefix` - path segment prepended to every OAuth endpoint
+      tail. Default `"/oauth"`, yielding the historic `/oauth/token`,
+      `/oauth/par`, etc. A host mounting under `/mcp/oauth` sets
+      `oauth_path_prefix: "/mcp/oauth"` to advertise `/mcp/oauth/token` and so
+      on. This is the FULL client-visible mount prefix, since the controllers
+      cannot see the surrounding Phoenix `scope`. The well-known documents
+      (RFC 8615) and the JWKS document stay anchored at the host root and are
+      NOT relocated by this prefix.
+    * `:authorize_path`, `:token_path`, `:par_path`, `:revocation_path`,
+      `:registration_path`, `:userinfo_path` - explicit per-endpoint path
+      overrides. When set, the override wins over `:oauth_path_prefix` for that
+      one endpoint (the integrator's "explicit endpoint overrides plus sane
+      defaults"). Each defaults to `nil`, meaning "derive from
+      `:oauth_path_prefix`". An override is an absolute path reference
+      (`"/custom/token"`), advertised verbatim merged onto the issuer.
+
+  Use the resolver helpers (`token_endpoint_url/1`, `par_endpoint_url/1`,
+  `revocation_endpoint_url/1`, `registration_endpoint_url/1`,
+  `userinfo_endpoint_url/1`, `authorize_endpoint_url/1`, `jwks_uri/1`, and the
+  resolved-path helpers `token_path/1` and friends) rather than re-deriving the
+  URLs in callers; the router macro derives its mounted-route tails from the
+  same source so the mounted routes and the advertised routes cannot drift.
+
+  ## Recommended production callback contracts
+
+  The loose `*_client`, `*_principal`, `authorize_scope`, consent, registration,
+  and event callbacks above are grouped into named behaviours that document the
+  full contract (with the governing RFC for each callback) and serve as the
+  recommended production shape: `AttestoPhoenix.ClientStore`,
+  `AttestoPhoenix.PrincipalStore`, `AttestoPhoenix.ScopePolicy`,
+  `AttestoPhoenix.ConsentPolicy`, `AttestoPhoenix.RegistrationStore`, and
+  `AttestoPhoenix.EventSink`. Wiring stays identical: pass an anonymous
+  function, a `{module, function}` pair, or a `{module, function, extra_args}`
+  triple per key as documented above. The behaviours are the contract; the
+  Config keys are how a host installs an implementation.
   """
 
   @enforce_keys [
@@ -243,6 +290,13 @@ defmodule AttestoPhoenix.Config do
     :nonce_store,
     :sweep_interval_ms,
     :table_prefix,
+    :authorize_path,
+    :token_path,
+    :par_path,
+    :revocation_path,
+    :registration_path,
+    :userinfo_path,
+    oauth_path_prefix: "/oauth",
     scopes_supported: [],
     claims_supported: [],
     acr_values_supported: [],
@@ -312,6 +366,13 @@ defmodule AttestoPhoenix.Config do
           nonce_store: module() | nil,
           sweep_interval_ms: pos_integer() | nil,
           table_prefix: String.t() | nil,
+          oauth_path_prefix: String.t(),
+          authorize_path: String.t() | nil,
+          token_path: String.t() | nil,
+          par_path: String.t() | nil,
+          revocation_path: String.t() | nil,
+          registration_path: String.t() | nil,
+          userinfo_path: String.t() | nil,
           scopes_supported: [String.t()],
           claims_supported: [String.t()],
           acr_values_supported: [String.t()],
@@ -374,14 +435,202 @@ defmodule AttestoPhoenix.Config do
   """
   @spec to_attesto_config(t(), keyword()) :: Attesto.Config.t()
   def to_attesto_config(%__MODULE__{} = config, extra \\ []) do
+    # The resolved token path is passed automatically so the core builder's
+    # `token_endpoint` (and the DPoP `htu` it derives) reflect where the host
+    # mounted the endpoint, without the consumer hand-passing
+    # `token_endpoint_path`. `extra` still wins (it is merged last) so a host
+    # can override it explicitly if it must.
     [
       issuer: config.issuer,
       audience: config.audience,
       keystore: config.keystore,
-      default_lifetime_seconds: config.access_token_ttl
+      default_lifetime_seconds: config.access_token_ttl,
+      token_endpoint_path: token_path(config)
     ]
     |> Keyword.merge(extra)
     |> Attesto.Config.new()
+  end
+
+  # The default OAuth endpoint tails appended to the resolved
+  # `:oauth_path_prefix` when no explicit per-endpoint override is set. These
+  # reproduce the historic `/oauth/*` surface when the prefix is its default
+  # `"/oauth"`.
+  @authorize_tail "/authorize"
+  @token_tail "/token"
+  @par_tail "/par"
+  @revocation_tail "/revoke"
+  @registration_tail "/register"
+  @userinfo_tail "/userinfo"
+
+  @doc false
+  @spec authorize_tail() :: String.t()
+  def authorize_tail, do: @authorize_tail
+
+  @doc false
+  @spec token_tail() :: String.t()
+  def token_tail, do: @token_tail
+
+  @doc false
+  @spec par_tail() :: String.t()
+  def par_tail, do: @par_tail
+
+  @doc false
+  @spec revocation_tail() :: String.t()
+  def revocation_tail, do: @revocation_tail
+
+  @doc false
+  @spec registration_tail() :: String.t()
+  def registration_tail, do: @registration_tail
+
+  @doc false
+  @spec userinfo_tail() :: String.t()
+  def userinfo_tail, do: @userinfo_tail
+
+  @doc """
+  The resolved request path of the authorization endpoint: the explicit
+  `:authorize_path` override when set, otherwise `:oauth_path_prefix` joined
+  with the conventional `#{@authorize_tail}` tail.
+  """
+  @spec authorize_path(t()) :: String.t()
+  def authorize_path(%__MODULE__{authorize_path: override} = config),
+    do: resolve_path(override, config, @authorize_tail)
+
+  @doc """
+  The resolved request path of the token endpoint. See `authorize_path/1`.
+  """
+  @spec token_path(t()) :: String.t()
+  def token_path(%__MODULE__{token_path: override} = config),
+    do: resolve_path(override, config, @token_tail)
+
+  @doc """
+  The resolved request path of the pushed-authorization-request endpoint
+  (RFC 9126). See `authorize_path/1`.
+  """
+  @spec par_path(t()) :: String.t()
+  def par_path(%__MODULE__{par_path: override} = config),
+    do: resolve_path(override, config, @par_tail)
+
+  @doc """
+  The resolved request path of the revocation endpoint (RFC 7009). See
+  `authorize_path/1`.
+  """
+  @spec revocation_path(t()) :: String.t()
+  def revocation_path(%__MODULE__{revocation_path: override} = config),
+    do: resolve_path(override, config, @revocation_tail)
+
+  @doc """
+  The resolved request path of the dynamic client registration endpoint
+  (RFC 7591). See `authorize_path/1`.
+  """
+  @spec registration_path(t()) :: String.t()
+  def registration_path(%__MODULE__{registration_path: override} = config),
+    do: resolve_path(override, config, @registration_tail)
+
+  @doc """
+  The resolved request path of the UserInfo endpoint (OpenID Connect Core
+  §5.3). See `authorize_path/1`.
+  """
+  @spec userinfo_path(t()) :: String.t()
+  def userinfo_path(%__MODULE__{userinfo_path: override} = config),
+    do: resolve_path(override, config, @userinfo_tail)
+
+  # An explicit per-endpoint override wins over the prefix; otherwise the
+  # endpoint path is the prefix joined with the conventional tail. The prefix
+  # default `"/oauth"` reproduces the historic surface.
+  defp resolve_path(override, _config, _tail) when is_binary(override) and override != "",
+    do: override
+
+  defp resolve_path(_override, %__MODULE__{oauth_path_prefix: prefix}, tail),
+    do: join_path(prefix, tail)
+
+  # Join a prefix and a tail into a single absolute path, collapsing the seam so
+  # neither a trailing slash on the prefix nor the leading slash on the tail
+  # doubles up.
+  defp join_path(prefix, tail) do
+    prefix = String.trim_trailing(to_string(prefix), "/")
+    tail = "/" <> String.trim_leading(tail, "/")
+    prefix <> tail
+  end
+
+  @doc """
+  Absolute URL of the authorization endpoint: the issuer merged with
+  `authorize_path/1`. Advertised in the OpenID Provider Metadata when the host
+  does not supply a separate `:authorization_endpoint`.
+  """
+  @spec authorize_endpoint_url(t()) :: String.t()
+  def authorize_endpoint_url(%__MODULE__{} = config),
+    do: endpoint_url(config, authorize_path(config))
+
+  @doc """
+  Absolute URL of the token endpoint: the issuer merged with `token_path/1`.
+  Advertised as `token_endpoint` (RFC 8414 §2).
+  """
+  @spec token_endpoint_url(t()) :: String.t()
+  def token_endpoint_url(%__MODULE__{} = config),
+    do: endpoint_url(config, token_path(config))
+
+  @doc """
+  Absolute URL of the pushed-authorization-request endpoint: the issuer merged
+  with `par_path/1`. Advertised as `pushed_authorization_request_endpoint`
+  (RFC 9126 §5).
+  """
+  @spec par_endpoint_url(t()) :: String.t()
+  def par_endpoint_url(%__MODULE__{} = config),
+    do: endpoint_url(config, par_path(config))
+
+  @doc """
+  Absolute URL of the revocation endpoint: the issuer merged with
+  `revocation_path/1`. Advertised as `revocation_endpoint` (RFC 8414 §2,
+  RFC 7009).
+  """
+  @spec revocation_endpoint_url(t()) :: String.t()
+  def revocation_endpoint_url(%__MODULE__{} = config),
+    do: endpoint_url(config, revocation_path(config))
+
+  @doc """
+  Absolute URL of the dynamic client registration endpoint: the issuer merged
+  with `registration_path/1`. Advertised as `registration_endpoint` (RFC 7591
+  §3) only when registration is enabled.
+  """
+  @spec registration_endpoint_url(t()) :: String.t()
+  def registration_endpoint_url(%__MODULE__{} = config),
+    do: endpoint_url(config, registration_path(config))
+
+  @doc """
+  Absolute URL of the UserInfo endpoint: the issuer merged with
+  `userinfo_path/1`. Used when the host does not supply a separate
+  `:userinfo_endpoint`.
+  """
+  @spec userinfo_endpoint_url(t()) :: String.t()
+  def userinfo_endpoint_url(%__MODULE__{} = config),
+    do: endpoint_url(config, userinfo_path(config))
+
+  @doc """
+  Absolute URL of an individual registered client's RFC 7592 management
+  endpoint: the registration endpoint URL with the URL-encoded `client_id`
+  appended. Returned as `registration_client_uri` in the RFC 7591 §3.2.1
+  client information response.
+  """
+  @spec registration_client_uri(t(), String.t()) :: String.t()
+  def registration_client_uri(%__MODULE__{} = config, client_id) when is_binary(client_id) do
+    encoded = URI.encode(client_id, &URI.char_unreserved?/1)
+    endpoint_url(config, join_path(registration_path(config), encoded))
+  end
+
+  @doc """
+  Absolute URL of the JWK Set document (RFC 7517 §5; the `jwks_uri` per
+  RFC 8414 §2). The JWKS document is anchored at the host root under RFC 8615,
+  so it is NOT relocated by `:oauth_path_prefix`.
+  """
+  @spec jwks_uri(t()) :: String.t()
+  def jwks_uri(%__MODULE__{} = config),
+    do: endpoint_url(config, "/.well-known/jwks.json")
+
+  defp endpoint_url(%__MODULE__{issuer: issuer}, path) do
+    issuer
+    |> URI.parse()
+    |> URI.merge(path)
+    |> URI.to_string()
   end
 
   @doc """
@@ -428,20 +677,78 @@ defmodule AttestoPhoenix.Config do
     Enum.each(@required, fn key ->
       if is_nil(Map.fetch!(config, key)) do
         raise ArgumentError,
-              "AttestoPhoenix.Config: required key #{inspect(key)} is missing"
+              "AttestoPhoenix.Config: required key #{inspect(key)} is missing. " <>
+                required_key_hint(key)
       end
     end)
 
     if config.mtls_enabled and is_nil(config.cert_der) do
       raise ArgumentError,
-            "AttestoPhoenix.Config: :cert_der is required when :mtls_enabled is true"
+            "AttestoPhoenix.Config: :cert_der is required when :mtls_enabled is true. " <>
+              "Add a `cert_der: &MyApp.AuthZ.cert_der/1` callback " <>
+              "(implements AttestoPhoenix.ClientStore-adjacent mTLS extraction) " <>
+              "or set `mtls_enabled: false`."
     end
 
     if config.registration_enabled and is_nil(config.register_client) do
       raise ArgumentError,
-            "AttestoPhoenix.Config: :register_client is required when :registration_enabled is true"
+            "AttestoPhoenix.Config: :register_client is required when " <>
+              ":registration_enabled is true. Add a " <>
+              "`register_client: &MyApp.AuthZ.register_client/1` callback " <>
+              "(see AttestoPhoenix.RegistrationStore) or set " <>
+              "`registration_enabled: false` so no registration endpoint is mounted."
     end
+
+    validate_path!(:oauth_path_prefix, config.oauth_path_prefix)
+    validate_optional_path!(:authorize_path, config.authorize_path)
+    validate_optional_path!(:token_path, config.token_path)
+    validate_optional_path!(:par_path, config.par_path)
+    validate_optional_path!(:revocation_path, config.revocation_path)
+    validate_optional_path!(:registration_path, config.registration_path)
+    validate_optional_path!(:userinfo_path, config.userinfo_path)
 
     config
   end
+
+  # The store/callback each required key installs, so a missing-key error tells
+  # the host exactly what to wire rather than just naming the key.
+  defp required_key_hint(:issuer),
+    do: "Set it to the https issuer URL (RFC 8414 §2), e.g. \"https://api.example\"."
+
+  defp required_key_hint(:keystore),
+    do: "Set it to a module implementing the Attesto.Keystore behaviour."
+
+  defp required_key_hint(:repo), do: "Set it to your Ecto.Repo module."
+
+  defp required_key_hint(:load_client),
+    do:
+      "Add a `load_client: &MyApp.AuthZ.load_client/1` callback " <>
+        "(see AttestoPhoenix.ClientStore.load_client/1)."
+
+  defp required_key_hint(:verify_client_secret),
+    do:
+      "Add a `verify_client_secret: &MyApp.AuthZ.verify_client_secret/2` callback " <>
+        "(see AttestoPhoenix.ClientStore.verify_client_secret/2)."
+
+  defp required_key_hint(:load_principal),
+    do:
+      "Add a `load_principal: &MyApp.AuthZ.load_principal/1` callback " <>
+        "(see AttestoPhoenix.PrincipalStore.load_principal/1)."
+
+  defp required_key_hint(_key), do: ""
+
+  # `:oauth_path_prefix` is always present (defaulted); it must be an absolute
+  # path reference so it merges cleanly onto the issuer.
+  defp validate_path!(key, value) do
+    if not (is_binary(value) and String.starts_with?(value, "/")) do
+      raise ArgumentError,
+            "AttestoPhoenix.Config: #{inspect(key)} must be an absolute path " <>
+              "beginning with \"/\" (e.g. \"/oauth\" or \"/mcp/oauth\"); got #{inspect(value)}"
+    end
+  end
+
+  # A per-endpoint override is optional (nil = derive from the prefix); when
+  # set it must be an absolute path reference.
+  defp validate_optional_path!(_key, nil), do: :ok
+  defp validate_optional_path!(key, value), do: validate_path!(key, value)
 end

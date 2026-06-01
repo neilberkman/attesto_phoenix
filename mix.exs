@@ -60,6 +60,15 @@ defmodule AttestoPhoenix.MixProject do
       {:plug, "~> 1.15"},
       # JSON encoding for token/discovery/JWKS responses.
       {:jason, "~> 1.4"},
+      # `mix attesto_phoenix.install` (Mix.Tasks.AttestoPhoenix.Install) is an
+      # upgrade-aware Igniter installer: it inspects the host's config and router
+      # and applies idempotent patches. Declared `optional: true` so the runtime
+      # hex package never forces igniter onto a consumer that only depends on the
+      # library at runtime. The dependency is present for the install task to
+      # compile against and for a host that opts into running the installer, but
+      # it is not a transitive runtime requirement. The `~> 0.5` requirement
+      # admits the current 0.6 line.
+      {:igniter, "~> 0.5", optional: true},
 
       # test - the bundled Ecto stores run against a real Postgres repo.
       {:postgrex, ">= 0.0.0", only: [:dev, :test]},
@@ -90,13 +99,31 @@ defmodule AttestoPhoenix.MixProject do
       main: "readme",
       source_ref: "v#{@version}",
       source_url: @url,
-      extras: ["README.md", "CHANGELOG.md", "LICENSE"],
+      extras: [
+        "README.md",
+        "guides/examples.md",
+        "guides/consumer_migration.md",
+        "guides/proxy_canonical_host.md",
+        "guides/replay_nonce_production.md",
+        "guides/error_envelope.md",
+        "CHANGELOG.md",
+        "LICENSE"
+      ],
       groups_for_extras: [
+        Guides: ~r/guides\/.*/,
         Changelog: ~r/CHANGELOG\.md/,
         License: ~r/LICENSE/
       ],
       groups_for_modules: [
         Setup: [AttestoPhoenix, AttestoPhoenix.Config, AttestoPhoenix.Router],
+        "Host contracts (behaviours)": [
+          AttestoPhoenix.ClientStore,
+          AttestoPhoenix.PrincipalStore,
+          AttestoPhoenix.ScopePolicy,
+          AttestoPhoenix.ConsentPolicy,
+          AttestoPhoenix.RegistrationStore,
+          AttestoPhoenix.EventSink
+        ],
         Controllers: [
           AttestoPhoenix.Controller.TokenController,
           AttestoPhoenix.Controller.RevocationController,
@@ -138,7 +165,7 @@ defmodule AttestoPhoenix.MixProject do
         "Changelog" => "https://hexdocs.pm/attesto_phoenix/changelog.html",
         "GitHub" => @url
       },
-      files: ~w(lib LICENSE mix.exs README.md CHANGELOG.md)
+      files: ~w(lib guides LICENSE mix.exs README.md CHANGELOG.md)
     ]
   end
 end

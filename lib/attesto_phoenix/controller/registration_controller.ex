@@ -110,6 +110,17 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
   # registered redirect URI (RFC 6749 §3.1.2). client_credentials does not.
   @redirect_requiring_grant_types ~w(authorization_code)
 
+  # RFC 7591 §2: human-facing client metadata members carried through to the
+  # host store so consent screens keep the client's identity. These are
+  # display/identity strings; the controller validates only that each is a
+  # string (their trust level is the host's, never the library's).
+  @display_string_metadata ~w(client_name client_uri logo_uri tos_uri policy_uri
+                              jwks_uri software_id software_version software_statement)
+
+  # RFC 7591 §2 `contacts`: an array of strings (e.g. email addresses) carried
+  # through to the host store.
+  @string_array_metadata ~w(contacts)
+
   @doc """
   Dynamic client registration action (RFC 7591 §3.1).
 
@@ -214,15 +225,69 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
     with {:ok, auth_method} <- validate_auth_method(metadata, config),
          {:ok, grant_types} <- validate_grant_types(metadata, config),
          {:ok, redirect_uris} <- validate_redirect_uris(metadata, grant_types),
-         {:ok, scope} <- validate_scope(metadata, config) do
-      {:ok,
-       %{
-         "token_endpoint_auth_method" => auth_method,
-         "grant_types" => grant_types,
-         "redirect_uris" => redirect_uris,
-         "scope" => scope
-       }}
+         {:ok, scope} <- validate_scope(metadata, config),
+         {:ok, passthrough} <- validate_passthrough_metadata(metadata) do
+      core = %{
+        "token_endpoint_auth_method" => auth_method,
+        "grant_types" => grant_types,
+        "redirect_uris" => redirect_uris,
+        "scope" => scope
+      }
+
+      # The known RFC 7591 §2 display/identity members are merged UNDER the
+      # protocol-critical members so a request can never override the validated
+      # auth method, grants, redirect URIs, or scope through a passthrough key.
+      {:ok, Map.merge(passthrough, core)}
     end
+  end
+
+  # RFC 7591 §2: validate and carry through the KNOWN client-identity metadata
+  # members (client_name, client_uri, logo_uri, contacts, policy_uri, tos_uri,
+  # ...) so consent screens keep the client's identity. Only members on the
+  # explicit allowlist are passed through; an unknown field is dropped and
+  # never promoted to trusted policy. The first malformed known member stops
+  # validation with `invalid_client_metadata` (RFC 7591 §3.2.2).
+  defp validate_passthrough_metadata(metadata) do
+    Enum.reduce_while(passthrough_specs(), {:ok, %{}}, fn {key, kind}, {:ok, acc} ->
+      case validate_passthrough_member(metadata, key, kind) do
+        :absent -> {:cont, {:ok, acc}}
+        {:ok, value} -> {:cont, {:ok, Map.put(acc, key, value)}}
+        {:error, _} = error -> {:halt, error}
+      end
+    end)
+  end
+
+  # The allowlist of known RFC 7591 §2 members carried through, each paired
+  # with the shape it must satisfy.
+  defp passthrough_specs do
+    Enum.map(@display_string_metadata, &{&1, :string}) ++
+      Enum.map(@string_array_metadata, &{&1, :string_array})
+  end
+
+  defp validate_passthrough_member(metadata, key, kind) do
+    case Map.get(metadata, key) do
+      nil -> :absent
+      value -> validate_passthrough_value(key, kind, value)
+    end
+  end
+
+  defp validate_passthrough_value(_key, :string, value) when is_binary(value), do: {:ok, value}
+
+  defp validate_passthrough_value(key, :string, _value) do
+    {:error, error(@error_invalid_client_metadata, "#{key} must be a string (RFC 7591 §2)")}
+  end
+
+  defp validate_passthrough_value(_key, :string_array, value) when is_list(value) do
+    if Enum.all?(value, &is_binary/1) do
+      {:ok, value}
+    else
+      {:error,
+       error(@error_invalid_client_metadata, "contacts must be an array of strings (RFC 7591 §2)")}
+    end
+  end
+
+  defp validate_passthrough_value(key, :string_array, _value) do
+    {:error, error(@error_invalid_client_metadata, "#{key} must be an array (RFC 7591 §2)")}
   end
 
   # RFC 7591 §2 / RFC 6749 §2.3.1: the token-endpoint auth method must be one
@@ -378,18 +443,10 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
       |> Map.put("client_id", client_id)
       |> Map.put("client_id_issued_at", System.system_time(:second))
       |> Map.put("registration_access_token", registration_access_token)
-      |> Map.put("registration_client_uri", registration_client_uri(config, client_id))
+      |> Map.put("registration_client_uri", Config.registration_client_uri(config, client_id))
       |> put_client_secret(client_secret)
 
     {:ok, issued}
-  end
-
-  defp registration_client_uri(config, client_id) do
-    encoded_client_id = URI.encode(client_id, &URI.char_unreserved?/1)
-
-    config.issuer
-    |> URI.merge("/oauth/register/#{encoded_client_id}")
-    |> URI.to_string()
   end
 
   # RFC 6749 §2.1: a public client holds no secret.

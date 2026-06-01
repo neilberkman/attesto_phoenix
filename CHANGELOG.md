@@ -6,6 +6,56 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Added
+
+- `mix attesto_phoenix.install`, an upgrade-aware Igniter installer. It is
+  idempotent and re-runnable: it adds the `AttestoPhoenix.Config` config skeleton
+  (issuer, keystore, repo, the Ecto-backed token stores, a chosen
+  `:oauth_path_prefix`, and neutral defaults) to the host config, mounts
+  `attesto_routes/1` at the chosen prefix into the host router, scaffolds host
+  callback modules implementing the recommended behaviours (`ClientStore`,
+  `PrincipalStore`, `ScopePolicy`, `ConsentPolicy`, `RegistrationStore`,
+  `EventSink`) with documented stub callbacks, and points the host at
+  `mix attesto_phoenix.gen.migration` for the Ecto tables. `igniter` is declared
+  as an optional dependency, so the runtime package never forces it on consumers;
+  the task is available to a host that opts into running it. Options:
+  `--oauth-path-prefix` and `--callbacks-module`.
+
+- Configurable OAuth endpoint paths. `AttestoPhoenix.Config` now accepts an
+  `:oauth_path_prefix` (default `"/oauth"`, reproducing the historic surface)
+  plus explicit per-endpoint overrides (`:authorize_path`, `:token_path`,
+  `:par_path`, `:revocation_path`, `:registration_path`, `:userinfo_path`) that
+  win when set. Resolver helpers (`token_endpoint_url/1`, `par_endpoint_url/1`,
+  `revocation_endpoint_url/1`, `registration_endpoint_url/1`,
+  `userinfo_endpoint_url/1`, `authorize_endpoint_url/1`, `jwks_uri/1`,
+  `registration_client_uri/2`, and the `*_path/1` helpers) build absolute URLs
+  from the issuer and the resolved path. The discovery (RFC 8414),
+  OpenID-configuration (OpenID Connect Discovery), and registration (RFC 7591 /
+  RFC 7592) controllers read every advertised URL from these resolvers instead
+  of hardcoding `/oauth/*`, and `to_attesto_config/2` passes the resolved token
+  path to the core builder automatically so the DPoP `htu` follows the mount.
+  A host that mounts under `/mcp/oauth` now advertises correct URLs.
+- Named host-contract behaviours documenting the full callback contract with
+  the governing RFC for each callback, as the recommended production shape:
+  `AttestoPhoenix.ClientStore`, `AttestoPhoenix.PrincipalStore`,
+  `AttestoPhoenix.ScopePolicy`, `AttestoPhoenix.ConsentPolicy`,
+  `AttestoPhoenix.RegistrationStore`, and `AttestoPhoenix.EventSink`. Wiring is
+  unchanged: pass an anonymous function, a `{module, function}` pair, or a
+  `{module, function, extra_args}` triple per `AttestoPhoenix.Config` key.
+- Dynamic registration metadata passthrough (RFC 7591 §2). The registration
+  endpoint now validates and carries the known client-identity members
+  (`client_name`, `client_uri`, `logo_uri`, `contacts`, `policy_uri`,
+  `tos_uri`, and related software/JWKS members) through to `:register_client`
+  so consent screens keep the client's identity. Unknown members are dropped
+  and never promoted to trusted policy; known members are merged under the
+  validated protocol-critical members so they cannot override them.
+- Actionable `AttestoPhoenix.Config.new/1` validation errors that name the
+  callback/store/path to add for each enabled feature, and absolute-path
+  validation for `:oauth_path_prefix` and the per-endpoint overrides.
+- Operations guides wired into the published docs: `replay_nonce_production.md`,
+  `proxy_canonical_host.md`, `error_envelope.md`, `consumer_migration.md`, and
+  `examples.md`.
+
 ## [0.6.2]
 
 - Advertise `response_modes_supported: ["query"]` from the RFC 8414 OAuth

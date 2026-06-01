@@ -141,6 +141,42 @@ defmodule AttestoPhoenix.Controller.DiscoveryControllerTest do
       assert body["registration_endpoint"] == "#{@issuer}/oauth/register"
     end
 
+    test "advertises endpoint URLs under a custom :oauth_path_prefix (RFC 8414 §2)" do
+      host =
+        host_config(
+          oauth_path_prefix: "/mcp/oauth",
+          registration_enabled: true,
+          register_client: fn _ -> {:error, :unsupported} end
+        )
+
+      body = call_show(host, protocol_config()) |> decode_body()
+
+      # token_endpoint comes from the core builder; this test passes the host
+      # config's resolved token path into the protocol config the same way
+      # to_attesto_config/2 does in production.
+      assert body["pushed_authorization_request_endpoint"] == "#{@issuer}/mcp/oauth/par"
+      assert body["registration_endpoint"] == "#{@issuer}/mcp/oauth/register"
+      # The well-known JWKS document is anchored at the host root (RFC 8615) and
+      # is NOT relocated by the prefix.
+      assert body["jwks_uri"] == "#{@issuer}/.well-known/jwks.json"
+    end
+
+    test "an explicit per-endpoint override wins over :oauth_path_prefix" do
+      host =
+        host_config(
+          oauth_path_prefix: "/mcp/oauth",
+          par_path: "/custom/par",
+          registration_enabled: true,
+          register_client: fn _ -> {:error, :unsupported} end
+        )
+
+      body = call_show(host, protocol_config()) |> decode_body()
+
+      assert body["pushed_authorization_request_endpoint"] == "#{@issuer}/custom/par"
+      # The unoverridden endpoint still follows the prefix.
+      assert body["registration_endpoint"] == "#{@issuer}/mcp/oauth/register"
+    end
+
     test "marks the response publicly cacheable (RFC 8414 §3)" do
       conn = call_show(host_config(), protocol_config())
 

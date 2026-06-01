@@ -91,13 +91,19 @@ defmodule AttestoPhoenix.Router do
   @openid_configuration_path "/.well-known/openid-configuration"
 
   # The OAuth endpoints live under the host-chosen `:prefix`. These are the
-  # path tails appended to it.
-  @authorize_path "/oauth/authorize"
-  @token_path "/oauth/token"
-  @par_path "/oauth/par"
-  @revoke_path "/oauth/revoke"
-  @register_path "/oauth/register"
-  @userinfo_path "/oauth/userinfo"
+  # path tails appended to it. They derive from the SAME tail constants
+  # `AttestoPhoenix.Config` resolves its advertised endpoint URLs from, joined
+  # onto the default OAuth prefix (`"/oauth"`), so the routes this macro mounts
+  # and the routes the discovery documents advertise cannot drift: a host that
+  # mounts at `/oauth/*` (the default) and configures the matching default
+  # `:oauth_path_prefix` advertises exactly the paths mounted here.
+  @oauth_prefix "/oauth"
+  @authorize_path @oauth_prefix <> AttestoPhoenix.Config.authorize_tail()
+  @token_path @oauth_prefix <> AttestoPhoenix.Config.token_tail()
+  @par_path @oauth_prefix <> AttestoPhoenix.Config.par_tail()
+  @revoke_path @oauth_prefix <> AttestoPhoenix.Config.revocation_tail()
+  @register_path @oauth_prefix <> AttestoPhoenix.Config.registration_tail()
+  @userinfo_path @oauth_prefix <> AttestoPhoenix.Config.userinfo_tail()
 
   # Controllers that back each endpoint. Named here once so the macro
   # expansion does not scatter controller module references through the
