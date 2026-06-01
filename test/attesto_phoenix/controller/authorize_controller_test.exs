@@ -283,6 +283,16 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
       assert location_query(conn)["error"] == "invalid_scope"
     end
 
+    test "unsupported request_uri redirects with request_uri_not_supported when no PAR store is configured" do
+      conn = call(valid_params(%{"request_uri" => "https://client.example.com/request.jwt"}))
+
+      assert conn.status == 302
+      query = location_query(conn)
+      assert query["error"] == "request_uri_not_supported"
+      assert query["state"] == "xyz"
+      refute Map.has_key?(query, "code")
+    end
+
     test "no code is issued when a redirectable error fires" do
       conn = call(valid_params(%{"response_type" => "token"}))
 

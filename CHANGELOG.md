@@ -6,6 +6,14 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-06-01
+
+### Fixed
+
+- Return a clean `request_uri_not_supported` authorization response for
+  unsupported OIDC `request_uri` references when no PAR store is configured,
+  instead of calling a nil PAR store.
+
 ## [0.6.4] - 2026-05-31
 
 ### Changed

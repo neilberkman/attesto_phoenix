@@ -2,7 +2,7 @@ defmodule AttestoPhoenix.MixProject do
   @moduledoc false
   use Mix.Project
 
-  @version "0.6.4"
+  @version "0.6.5"
   @url "https://github.com/neilberkman/attesto_phoenix"
   @maintainers ["Neil Berkman"]
 

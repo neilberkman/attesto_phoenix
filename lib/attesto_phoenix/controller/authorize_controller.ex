@@ -216,9 +216,15 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
 
   defp resolve_request_uri(config, %{"request_uri" => request_uri} = params)
        when is_binary(request_uri) and request_uri != "" do
-    case par_store(config).take(request_uri) do
-      {:ok, stored} -> Map.merge(params, stored) |> Map.delete("request_uri")
-      :error -> params
+    case par_store(config) do
+      nil ->
+        params
+
+      store ->
+        case store.take(request_uri) do
+          {:ok, stored} -> Map.merge(params, stored) |> Map.delete("request_uri")
+          :error -> params
+        end
     end
   end
 
