@@ -6,6 +6,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.18] - 2026-06-02
+
+### Added
+
+- Add `:client_requires_dpop?` as a host callback so deployments can mark a
+  client as requiring DPoP-bound token issuance. When such a client calls the
+  token endpoint without a DPoP proof, the controller now rejects the request
+  with `invalid_dpop_proof` rather than silently issuing an unbound Bearer
+  token.
+
 ## [0.6.17] - 2026-06-02
 
 ### Fixed

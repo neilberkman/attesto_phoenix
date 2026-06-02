@@ -76,9 +76,9 @@ defmodule AttestoPhoenix.Controller.TokenController do
   client- and grant-shaped pieces this library cannot know generically. They
   are read defensively and fail closed when unset: a missing
   `:client_public?` treats every client as confidential (so no secretless
-  authentication), a missing `:client_requires_mtls?` treats no client as
-  mTLS-required, and a missing `:build_principal` yields a fail-closed
-  `invalid_request` rather than a crash.
+  authentication), missing sender-constraint callbacks treat no client as
+  requiring that constraint, and a missing `:build_principal` yields a
+  fail-closed `invalid_request` rather than a crash.
 
     * `:client_public?` - `(client -> boolean)` public/confidential
       discriminator (RFC 6749 §2.1). A client that is not public MUST present
@@ -86,6 +86,9 @@ defmodule AttestoPhoenix.Controller.TokenController do
     * `:client_requires_mtls?` - `(client -> boolean)` certificate-binding
       requirement (RFC 8705). A client that requires mTLS and calls without a
       certificate is rejected, not downgraded to Bearer.
+    * `:client_requires_dpop?` - `(client -> boolean)` DPoP-binding
+      requirement (RFC 9449). A client that requires DPoP and calls without a
+      proof is rejected, not downgraded to Bearer.
     * `:client_id` - `(client -> String.t())` the client's identifier
       (RFC 6749 §2.2).
     * `:build_principal` - `(client, subject, scope -> Attesto principal map)`
@@ -1076,12 +1079,16 @@ defmodule AttestoPhoenix.Controller.TokenController do
   # `{:dpop, jkt}`, `{:mtls, thumbprint}`, or `:none`. DPoP takes precedence
   # when a proof is presented (RFC 9449 §5); otherwise an mTLS certificate
   # binds the token to its thumbprint; otherwise the token is an unbound
-  # Bearer - but only if the client does not *require* mTLS.
+  # Bearer - but only if the client does not *require* a sender constraint.
   #
   # RFC 8705 §3: a client configured to require certificate-bound tokens MUST
   # NOT be silently downgraded to a Bearer token when it calls without a
   # certificate; that would strip the sender constraint the deployment relies
   # on. The host's `:client_requires_mtls?` callback gates this.
+  #
+  # RFC 9449 is the DPoP equivalent: a client configured for DPoP-bound token
+  # issuance must present a proof at the token endpoint. Otherwise issuing an
+  # unbound Bearer token silently removes the proof-of-possession property.
   defp resolve_sender_constraint(config, conn, client) do
     cond do
       config.dpop_enabled and dpop_present?(conn) ->
@@ -1089,6 +1096,9 @@ defmodule AttestoPhoenix.Controller.TokenController do
 
       config.mtls_enabled and mtls_cert_present?(config, conn) ->
         bind_mtls(config, conn)
+
+      client_requires_dpop?(config, client) ->
+        {:error, error(@error_invalid_dpop_proof, "DPoP proof required")}
 
       client_requires_mtls?(config, client) ->
         # No DPoP proof and no client certificate, yet this client must be
@@ -1106,6 +1116,10 @@ defmodule AttestoPhoenix.Controller.TokenController do
   # it. (mTLS itself is off by default per `:mtls_enabled`.)
   defp client_requires_mtls?(config, client) do
     invoke_with_default(config_callback(config, :client_requires_mtls?), [client], false) == true
+  end
+
+  defp client_requires_dpop?(config, client) do
+    invoke_with_default(config_callback(config, :client_requires_dpop?), [client], false) == true
   end
 
   defp mtls_cert_present?(config, conn) do

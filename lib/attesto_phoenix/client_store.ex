@@ -21,6 +21,7 @@ defmodule AttestoPhoenix.ClientStore do
     * `client_redirect_uris/1` (`:client_redirect_uris`)
     * `client_public?/1` (`:client_public?`)
     * `client_requires_mtls?/1` (`:client_requires_mtls?`)
+    * `client_requires_dpop?/1` (`:client_requires_dpop?`)
     * `client_grant_types/1` (`:client_grant_types`)
 
   The `client` term is opaque to the library: whatever
@@ -82,6 +83,11 @@ defmodule AttestoPhoenix.ClientStore do
   @callback client_requires_mtls?(client()) :: boolean()
 
   @doc """
+  Whether the client requires DPoP-bound token issuance (RFC 9449).
+  """
+  @callback client_requires_dpop?(client()) :: boolean()
+
+  @doc """
   The grant types registered for this client (RFC 7591 §2).
 
   When the host exposes this callback, the token endpoint rejects a requested
@@ -96,5 +102,6 @@ defmodule AttestoPhoenix.ClientStore do
                       client_redirect_uris: 1,
                       client_public?: 1,
                       client_requires_mtls?: 1,
+                      client_requires_dpop?: 1,
                       client_grant_types: 1
 end

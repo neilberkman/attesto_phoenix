@@ -795,6 +795,44 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
       assert body(conn)["token_type"] == "DPoP"
     end
 
+    test "a DPoP-required client calling without proof is rejected, not downgraded" do
+      enable_minting()
+
+      put_config(
+        dpop_enabled: true,
+        client_requires_dpop?: fn _client -> true end
+      )
+
+      conn =
+        post_token(%{
+          "grant_type" => "client_credentials",
+          "client_id" => "confidential-1",
+          "client_secret" => "s3cr3t",
+          "scope" => "read"
+        })
+
+      assert conn.status == 400
+      assert body(conn)["error"] == "invalid_dpop_proof"
+      assert body(conn)["error_description"] =~ "DPoP"
+    end
+
+    test "a DPoP-required authorization-code client calling without proof is rejected" do
+      enable_minting()
+      code_store = start_code_store("oc_sub-1", ["openid"])
+
+      put_config(
+        code_store: code_store,
+        dpop_enabled: true,
+        client_requires_dpop?: fn _client -> true end
+      )
+
+      conn = post_auth_code()
+
+      assert conn.status == 400
+      assert body(conn)["error"] == "invalid_dpop_proof"
+      assert body(conn)["error_description"] =~ "DPoP"
+    end
+
     test "a DPoP-bound authorization code rejects a different token proof key" do
       enable_minting()
       {_bound_proof, bound_jkt} = dpop_proof_and_jkt([])
