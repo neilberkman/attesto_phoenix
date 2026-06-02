@@ -226,7 +226,10 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
 
       store ->
         case fetch_par_request(store, request_uri) do
-          {:ok, stored} -> {Map.merge(params, stored) |> Map.delete("request_uri"), true}
+          # PAR/request-object request parameters are authoritative. Front-channel
+          # parameters outside the pushed request, such as `state`, must not be
+          # used to augment the authorization request.
+          {:ok, stored} -> {stored, true}
           :error -> {params, false}
         end
     end

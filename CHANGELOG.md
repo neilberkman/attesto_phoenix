@@ -6,6 +6,15 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.17] - 2026-06-02
+
+### Fixed
+
+- Treat a resolved PAR `request_uri` as the complete authorization request, so
+  front-channel parameters outside the pushed request object do not augment the
+  request. In particular, a `state` query parameter that was not included in the
+  pushed request is no longer echoed in the authorization response.
+
 ## [0.6.16] - 2026-06-02
 
 ### Fixed

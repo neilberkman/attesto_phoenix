@@ -234,6 +234,29 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
       assert query["state"] == "xyz"
     end
 
+    test "ignores front-channel state outside a resolved PAR request" do
+      request_uri = "urn:ietf:params:oauth:request_uri:state-outside-par"
+
+      put_config(
+        require_pushed_authorization_requests: true,
+        par_store: PARStore
+      )
+
+      :ok = PARStore.put(request_uri, valid_params() |> Map.delete("state"), 60)
+
+      conn =
+        call(%{
+          "client_id" => @client_id,
+          "request_uri" => request_uri,
+          "state" => "front-channel-state"
+        })
+
+      assert conn.status == 302
+      query = location_query(conn)
+      assert is_binary(query["code"])
+      refute Map.has_key?(query, "state")
+    end
+
     test "carries a PAR DPoP thumbprint into the issued authorization code" do
       request_uri = "urn:ietf:params:oauth:request_uri:dpop-bound"
       jkt = Attesto.Secret.hash("par-proof-key")
