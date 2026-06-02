@@ -421,7 +421,7 @@ defmodule AttestoPhoenix.Controller.TokenController do
   end
 
   defp client_assertion_audiences(config) do
-    [Config.token_endpoint_url(config)]
+    [config.issuer, Config.token_endpoint_url(config)]
   end
 
   defp consume_client_assertion_jti(config, client_id, %{"jti" => jti})

@@ -180,7 +180,7 @@ defmodule AttestoPhoenix.Controller.PARController do
   end
 
   defp client_assertion_audiences(config) do
-    [Config.par_endpoint_url(config)]
+    [config.issuer, Config.par_endpoint_url(config)]
   end
 
   defp consume_client_assertion_jti(config, client_id, %{"jti" => jti})

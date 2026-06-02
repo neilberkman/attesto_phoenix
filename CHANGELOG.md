@@ -6,6 +6,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.13] - 2026-06-01
+
+### Fixed
+
+- Accept `private_key_jwt` client assertions whose `aud` is the issuer at the
+  token endpoint and PAR endpoint, while continuing to accept endpoint-specific
+  audiences and reject unrelated audiences. This matches FAPI conformance suite
+  client-authentication behavior without relaxing signature, `iss`/`sub`, `jti`,
+  or replay checks.
+
 ## [0.6.12] - 2026-06-01
 
 ### Security

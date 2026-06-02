@@ -294,6 +294,45 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
       assert body(conn)["error"] == "unsupported_grant_type"
     end
 
+    test "accepts private_key_jwt assertion audience set to issuer" do
+      client_key = JOSE.JWK.generate_key({:ec, "P-256"})
+      client_jwks = %{"keys" => [public_jwk(client_key)]}
+
+      put_config(client_jwks: fn %{id: "confidential-1"} -> client_jwks end)
+
+      assertion =
+        client_assertion(client_key, "confidential-1", %{"aud" => "https://issuer.example"})
+
+      conn =
+        post_token(%{
+          "grant_type" => "unsupported",
+          "client_assertion_type" => Attesto.ClientAssertion.assertion_type(),
+          "client_assertion" => assertion
+        })
+
+      assert body(conn)["error"] == "unsupported_grant_type"
+    end
+
+    test "rejects private_key_jwt assertion audience outside issuer and token endpoint" do
+      client_key = JOSE.JWK.generate_key({:ec, "P-256"})
+      client_jwks = %{"keys" => [public_jwk(client_key)]}
+
+      put_config(client_jwks: fn %{id: "confidential-1"} -> client_jwks end)
+
+      assertion =
+        client_assertion(client_key, "confidential-1", %{"aud" => "https://other.example"})
+
+      conn =
+        post_token(%{
+          "grant_type" => "unsupported",
+          "client_assertion_type" => Attesto.ClientAssertion.assertion_type(),
+          "client_assertion" => assertion
+        })
+
+      assert conn.status == 400
+      assert body(conn)["error"] == "invalid_client"
+    end
+
     test "rejects replayed private_key_jwt assertions" do
       client_key = JOSE.JWK.generate_key({:ec, "P-256"})
       client_jwks = %{"keys" => [public_jwk(client_key)]}

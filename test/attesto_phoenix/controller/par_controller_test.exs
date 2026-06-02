@@ -203,6 +203,49 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
     refute Map.has_key?(stored, "client_assertion_type")
   end
 
+  test "accepts private_key_jwt assertion audience set to issuer" do
+    client_key = JOSE.JWK.generate_key({:ec, "P-256"})
+    client_jwks = %{"keys" => [public_jwk(client_key)]}
+
+    put_config(client_jwks: fn %{id: "confidential-1"} -> client_jwks end)
+
+    params =
+      Map.merge(auth_params(), %{
+        "client_assertion_type" => Attesto.ClientAssertion.assertion_type(),
+        "client_assertion" =>
+          client_assertion(client_key, "confidential-1", %{"aud" => "https://issuer.example"})
+      })
+
+    conn =
+      :post
+      |> conn(@endpoint_path, params)
+      |> PARController.create(params)
+
+    assert conn.status == 201
+  end
+
+  test "rejects private_key_jwt assertion audience outside issuer and PAR endpoint" do
+    client_key = JOSE.JWK.generate_key({:ec, "P-256"})
+    client_jwks = %{"keys" => [public_jwk(client_key)]}
+
+    put_config(client_jwks: fn %{id: "confidential-1"} -> client_jwks end)
+
+    params =
+      Map.merge(auth_params(), %{
+        "client_assertion_type" => Attesto.ClientAssertion.assertion_type(),
+        "client_assertion" =>
+          client_assertion(client_key, "confidential-1", %{"aud" => "https://other.example"})
+      })
+
+    conn =
+      :post
+      |> conn(@endpoint_path, params)
+      |> PARController.create(params)
+
+    assert conn.status == 400
+    assert JSON.decode!(conn.resp_body)["error"] == "invalid_client"
+  end
+
   test "rejects replayed private_key_jwt assertions" do
     client_key = JOSE.JWK.generate_key({:ec, "P-256"})
     client_jwks = %{"keys" => [public_jwk(client_key)]}
