@@ -552,7 +552,13 @@ defmodule AttestoPhoenix.Controller.TokenController do
          requested = parse_requested_scope(params),
          {:ok, binding, token_type} <- resolve_sender_constraint(config, conn, client),
          {:ok, rotated} <-
-           rotate_refresh(config, client, presented, requested, binding_jkt(binding)),
+           rotate_refresh(
+             config,
+             client,
+             presented,
+             requested,
+             refresh_binding_jkt(config, client, binding)
+           ),
          {:ok, scope} <- authorize_scope(config, client, rotated.context.scope),
          {:ok, response} <-
            mint(config, client, rotated.context.subject, scope, token_type, binding) do
@@ -710,9 +716,12 @@ defmodule AttestoPhoenix.Controller.TokenController do
   #     `offline_access` scope (OIDC Core §11), the standard signal that the
   #     client asked for offline access.
   #
-  # The refresh token is bound to the same DPoP key as the access token when
-  # the request was DPoP-constrained (RFC 9449), so rotation later requires
-  # the matching proof. An mTLS-bound request issues no DPoP binding on the
+  # RFC 9449 §8 requires DPoP-bound refresh tokens for public clients. For
+  # confidential clients, the refresh token remains bound to the authenticated
+  # client_id (RFC 6749 §6 / §10.4) rather than to one DPoP proof key; this
+  # lets a confidential client rotate or recover its DPoP key while each newly
+  # minted access token is still sender-constrained to the proof presented on
+  # that token request. An mTLS-bound request issues no DPoP binding on the
   # refresh token. The plaintext token is added to the RFC 6749 §5.1 body;
   # only its hash is persisted (see `Attesto.RefreshToken`).
   @offline_access_scope "offline_access"
@@ -751,7 +760,7 @@ defmodule AttestoPhoenix.Controller.TokenController do
     context =
       %{subject: grant.subject, scope: scope}
       |> put_optional(:client_id, client_id(config, client))
-      |> put_optional(:dpop_jkt, binding_jkt(binding))
+      |> put_optional(:dpop_jkt, refresh_binding_jkt(config, client, binding))
 
     # OAuth 2.0 Security BCP §4.13: mint the initial token into the code's
     # `family_id` so the spent code and its descendant tokens share one
@@ -1039,6 +1048,10 @@ defmodule AttestoPhoenix.Controller.TokenController do
   # `:dpop_jkt` opt; an mTLS binding carries no DPoP thumbprint.
   defp binding_jkt({:dpop, jkt}), do: jkt
   defp binding_jkt(_binding), do: nil
+
+  defp refresh_binding_jkt(config, client, binding) do
+    if client_public?(config, client), do: binding_jkt(binding), else: nil
+  end
 
   defp build_principal(config, client, subject, scope) do
     case invoke(config_callback(config, :build_principal), [client, subject, scope]) do

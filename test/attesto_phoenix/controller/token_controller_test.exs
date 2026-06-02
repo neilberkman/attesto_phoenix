@@ -995,6 +995,69 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
       assert conn.status == 200
       assert is_binary(body(conn)["refresh_token"])
     end
+
+    test "confidential DPoP refresh rotation may use a fresh proof key" do
+      enable_minting()
+      start_refresh_store()
+      {initial_proof, initial_jkt} = dpop_proof_and_jkt([])
+
+      code_store =
+        start_dpop_confidential_code_store("oc_sub-1", ["openid", "offline_access"], initial_jkt)
+
+      put_config(
+        refresh_store: Attesto.RefreshStore.ETS,
+        code_store: code_store,
+        dpop_enabled: true,
+        require_pkce: false
+      )
+
+      initial = post_dpop_confidential_auth_code(initial_proof)
+
+      assert initial.status == 200
+      refresh_token = body(initial)["refresh_token"]
+      assert is_binary(refresh_token)
+
+      {refresh_proof, refresh_jkt} = dpop_proof_and_jkt([])
+      rotated = post_dpop_confidential_refresh(refresh_token, refresh_proof)
+
+      assert rotated.status == 200
+      assert is_binary(body(rotated)["refresh_token"])
+      assert peek_claims(body(rotated)["access_token"])["cnf"]["jkt"] == refresh_jkt
+    end
+
+    test "public DPoP refresh rotation still requires the original proof key" do
+      enable_minting()
+      start_refresh_store()
+      {initial_proof, initial_jkt} = dpop_proof_and_jkt([])
+      code_store = start_dpop_code_store("oc_sub-1", ["openid", "offline_access"], initial_jkt)
+
+      put_config(
+        refresh_store: Attesto.RefreshStore.ETS,
+        code_store: code_store,
+        dpop_enabled: true
+      )
+
+      initial =
+        post_dpop_auth_code(
+          %{
+            "client_id" => "public-1",
+            "code" => Process.get(:auth_code),
+            "code_verifier" => @code_verifier,
+            "redirect_uri" => @redirect_uri
+          },
+          initial_proof
+        )
+
+      assert initial.status == 200
+      refresh_token = body(initial)["refresh_token"]
+      assert is_binary(refresh_token)
+
+      {wrong_proof, _wrong_jkt} = dpop_proof_and_jkt([])
+      rotated = post_dpop_public_refresh(refresh_token, wrong_proof)
+
+      assert rotated.status == 400
+      assert body(rotated)["error"] == "invalid_grant"
+    end
   end
 
   # OAuth 2.0 Security BCP §4.13 / RFC 6749 §4.1.2: re-presenting an
@@ -1319,6 +1382,23 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
     store
   end
 
+  defp start_dpop_confidential_code_store(subject, scope, dpop_jkt) do
+    store = ensure_started(Attesto.CodeStore.ETS)
+
+    {:ok, code} =
+      Attesto.AuthorizationCode.issue(store, %{
+        client_id: "confidential-1",
+        redirect_uri: @redirect_uri,
+        scope: scope,
+        subject: subject,
+        dpop_jkt: dpop_jkt,
+        claims: %{"nonce" => "n-confidential"}
+      })
+
+    Process.put(:auth_code, code)
+    store
+  end
+
   # A code store pre-seeded with an OpenID Connect authorization code: the
   # granted scope drives ID Token issuance, and `claims` carries the
   # Authentication Request context (nonce, auth_time, acr, amr) the ID Token
@@ -1449,6 +1529,51 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
 
   defp post_dpop_auth_code(params, proof) do
     params = Map.put(params, "grant_type", "authorization_code")
+    %Plug.Conn{} = base = conn(:post, @endpoint_path, params)
+
+    %Plug.Conn{base | scheme: :https, host: "issuer.example", port: 443}
+    |> put_req_header("dpop", proof)
+    |> TokenController.create(params)
+  end
+
+  defp post_dpop_confidential_auth_code(proof) do
+    params = %{
+      "grant_type" => "authorization_code",
+      "code" => Process.get(:auth_code),
+      "redirect_uri" => @redirect_uri
+    }
+
+    %Plug.Conn{} = base = conn(:post, @endpoint_path, params)
+
+    %Plug.Conn{base | scheme: :https, host: "issuer.example", port: 443}
+    |> put_req_header("authorization", "Basic " <> Base.encode64("confidential-1:s3cr3t"))
+    |> put_req_header("dpop", proof)
+    |> TokenController.create(params)
+  end
+
+  defp post_dpop_confidential_refresh(refresh_token, proof) do
+    params = %{
+      "grant_type" => "refresh_token",
+      "refresh_token" => refresh_token,
+      "scope" => "openid offline_access"
+    }
+
+    %Plug.Conn{} = base = conn(:post, @endpoint_path, params)
+
+    %Plug.Conn{base | scheme: :https, host: "issuer.example", port: 443}
+    |> put_req_header("authorization", "Basic " <> Base.encode64("confidential-1:s3cr3t"))
+    |> put_req_header("dpop", proof)
+    |> TokenController.create(params)
+  end
+
+  defp post_dpop_public_refresh(refresh_token, proof) do
+    params = %{
+      "grant_type" => "refresh_token",
+      "client_id" => "public-1",
+      "refresh_token" => refresh_token,
+      "scope" => "openid offline_access"
+    }
+
     %Plug.Conn{} = base = conn(:post, @endpoint_path, params)
 
     %Plug.Conn{base | scheme: :https, host: "issuer.example", port: 443}

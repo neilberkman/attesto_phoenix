@@ -6,6 +6,16 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.6.19] - 2026-06-02
+
+### Fixed
+
+- Bind refresh tokens to the DPoP proof key only for public clients, as
+  required by RFC 9449. Confidential clients keep refresh tokens bound to the
+  authenticated client, allowing a later refresh request to use a fresh DPoP
+  proof key while still minting the returned access token as DPoP-bound to that
+  current proof.
+
 ## [0.6.18] - 2026-06-02
 
 ### Added
