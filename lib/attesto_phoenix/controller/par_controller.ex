@@ -58,13 +58,15 @@ defmodule AttestoPhoenix.Controller.PARController do
   # PAR endpoint's policy: a request reference established without proof of
   # possession of the client secret would let anyone who knows a confidential
   # client's `client_id` push requests in its name, so the secretless
-  # public-client path is refused here (`allow_public: false`); client
-  # assertions are audienced to the issuer (FAPI 2 / RFC 7523 §3) and live at
-  # most `@client_assertion_max_lifetime` seconds (RFC 7523 §3).
+  # public-client path is refused here (`allow_public: false`); a client
+  # assertion may be audienced to either the issuer identifier or the concrete
+  # endpoint URL it is presented at (RFC 7523 §3 / OIDC Core §9), both derived
+  # from trusted `Config` (never the request `Host`), and lives at most
+  # `@client_assertion_max_lifetime` seconds (RFC 7523 §3).
   defp authenticate_client(config, conn, params) do
     policy = %Policy{
       allow_public: false,
-      assertion_audiences: [config.issuer],
+      assertion_audiences: [config.issuer, Config.par_endpoint_url(config)],
       assertion_max_lifetime: @client_assertion_max_lifetime
     }
 

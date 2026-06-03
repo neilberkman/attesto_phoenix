@@ -314,7 +314,30 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
     assert conn.status == 201
   end
 
-  test "rejects private_key_jwt assertion audience that is not the issuer" do
+  test "accepts private_key_jwt assertion audience set to the PAR endpoint URL" do
+    client_key = JOSE.JWK.generate_key({:ec, "P-256"})
+    client_jwks = %{"keys" => [public_jwk(client_key)]}
+
+    put_config(client_jwks: fn %{id: "confidential-1"} -> client_jwks end)
+
+    params =
+      Map.merge(auth_params(), %{
+        "client_assertion_type" => Attesto.ClientAssertion.assertion_type(),
+        "client_assertion" =>
+          client_assertion(client_key, "confidential-1", %{
+            "aud" => "https://issuer.example/oauth/par"
+          })
+      })
+
+    conn =
+      :post
+      |> conn(@endpoint_path, params)
+      |> PARController.create(params)
+
+    assert conn.status == 201
+  end
+
+  test "rejects private_key_jwt assertion audience that is neither the issuer nor the endpoint" do
     client_key = JOSE.JWK.generate_key({:ec, "P-256"})
     client_jwks = %{"keys" => [public_jwk(client_key)]}
 

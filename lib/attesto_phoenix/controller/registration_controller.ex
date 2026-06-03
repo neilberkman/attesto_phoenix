@@ -157,9 +157,10 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
   @doc """
   Dynamic client registration management delete action (RFC 7592 §2).
 
-  The OpenID conformance suite uses this as cleanup for dynamically registered
-  clients. A host must wire both `:client_registration_access_token_hash` and
-  `:unregister_client`; absent either callback, the endpoint fails closed.
+  Deletes a previously registered client at its client configuration endpoint
+  (RFC 7592 §2.3). A host must wire both
+  `:client_registration_access_token_hash` and `:unregister_client`; absent
+  either callback, the endpoint fails closed.
   """
   @spec delete(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def delete(conn, %{"client_id" => client_id}) when is_binary(client_id) do

@@ -638,12 +638,12 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
 
   # The request is untrusted (bad client_id / redirect_uri / transport), so the
   # error MUST NOT be redirected (open-redirect protection). It is rendered
-  # directly to the user agent as a 400 body. Browser-driven conformance tests
-  # need a visible page for manual review, so an `Accept: text/html` request gets
-  # minimal HTML; non-browser callers keep the JSON body. The body is encoded and
-  # sent directly (not through Phoenix content negotiation) so a user agent that
-  # arrived without an `Accept` header still receives the error rather than a
-  # 406.
+  # directly to the user agent as a 400 body (OIDC Core §3.1.2.6). The response
+  # is content-negotiated on the request's `Accept`: an `Accept: text/html`
+  # request gets minimal HTML for a human reviewing it in a browser; other
+  # callers keep the JSON body. The body is encoded and sent directly (not
+  # through Phoenix content negotiation) so a user agent that arrived without an
+  # `Accept` header still receives the error rather than a 406.
   defp render_direct_error(conn, _config, reason) do
     description = direct_error_description(reason)
 
