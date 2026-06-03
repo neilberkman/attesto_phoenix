@@ -90,6 +90,14 @@ defmodule AttestoPhoenix.Controller.DiscoveryControllerTest do
       assert body["authorization_signing_alg_values_supported"] == ["RS256"]
     end
 
+    test "advertises the introspection endpoint, auth methods, and signing algs (RFC 7662 / 9701)" do
+      body = call_show(host_config(), protocol_config()) |> decode_body()
+
+      assert body["introspection_endpoint"] == "#{@issuer}/oauth/introspect"
+      assert is_list(body["introspection_endpoint_auth_methods_supported"])
+      assert body["introspection_signing_alg_values_supported"] == ["RS256"]
+    end
+
     test "advertises S256 as the only code challenge method (RFC 7636)" do
       body = call_show(host_config(), protocol_config()) |> decode_body()
 

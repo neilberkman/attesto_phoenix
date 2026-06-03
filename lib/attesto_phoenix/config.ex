@@ -253,7 +253,7 @@ defmodule AttestoPhoenix.Config do
       (RFC 8615) and the JWKS document stay anchored at the host root and are
       NOT relocated by this prefix.
     * `:authorize_path`, `:token_path`, `:par_path`, `:revocation_path`,
-      `:registration_path`, `:userinfo_path` - explicit per-endpoint path
+      `:introspection_path`, `:registration_path`, `:userinfo_path` - explicit per-endpoint path
       overrides. When set, the override wins over `:oauth_path_prefix` for that
       one endpoint (the integrator's "explicit endpoint overrides plus sane
       defaults"). Each defaults to `nil`, meaning "derive from
@@ -376,6 +376,7 @@ defmodule AttestoPhoenix.Config do
     :token_path,
     :par_path,
     :revocation_path,
+    :introspection_path,
     :registration_path,
     :userinfo_path,
     oauth_path_prefix: "/oauth",
@@ -470,6 +471,7 @@ defmodule AttestoPhoenix.Config do
           token_path: String.t() | nil,
           par_path: String.t() | nil,
           revocation_path: String.t() | nil,
+          introspection_path: String.t() | nil,
           registration_path: String.t() | nil,
           userinfo_path: String.t() | nil,
           scopes_supported: [String.t()],
@@ -598,6 +600,7 @@ defmodule AttestoPhoenix.Config do
   @token_tail "/token"
   @par_tail "/par"
   @revocation_tail "/revoke"
+  @introspection_tail "/introspect"
   @registration_tail "/register"
   @userinfo_tail "/userinfo"
 
@@ -616,6 +619,10 @@ defmodule AttestoPhoenix.Config do
   @doc false
   @spec revocation_tail() :: String.t()
   def revocation_tail, do: @revocation_tail
+
+  @doc false
+  @spec introspection_tail() :: String.t()
+  def introspection_tail, do: @introspection_tail
 
   @doc false
   @spec registration_tail() :: String.t()
@@ -656,6 +663,14 @@ defmodule AttestoPhoenix.Config do
   @spec revocation_path(t()) :: String.t()
   def revocation_path(%__MODULE__{revocation_path: override} = config),
     do: resolve_path(override, config, @revocation_tail)
+
+  @doc """
+  The resolved request path of the token introspection endpoint (RFC 7662). See
+  `authorize_path/1`.
+  """
+  @spec introspection_path(t()) :: String.t()
+  def introspection_path(%__MODULE__{introspection_path: override} = config),
+    do: resolve_path(override, config, @introspection_tail)
 
   @doc """
   The resolved request path of the dynamic client registration endpoint
@@ -725,6 +740,14 @@ defmodule AttestoPhoenix.Config do
   @spec revocation_endpoint_url(t()) :: String.t()
   def revocation_endpoint_url(%__MODULE__{} = config),
     do: endpoint_url(config, revocation_path(config))
+
+  @doc """
+  Absolute URL of the token introspection endpoint (RFC 7662): the issuer merged
+  with `introspection_path/1`. Advertised as `introspection_endpoint`.
+  """
+  @spec introspection_endpoint_url(t()) :: String.t()
+  def introspection_endpoint_url(%__MODULE__{} = config),
+    do: endpoint_url(config, introspection_path(config))
 
   @doc """
   Absolute URL of the dynamic client registration endpoint: the issuer merged

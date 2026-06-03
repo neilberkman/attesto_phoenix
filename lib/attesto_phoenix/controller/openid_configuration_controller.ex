@@ -207,6 +207,9 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
       authorization_endpoint: config.authorization_endpoint,
       userinfo_endpoint: config.userinfo_endpoint,
       revocation_endpoint: revocation_endpoint(config),
+      introspection_endpoint: Config.introspection_endpoint_url(config),
+      introspection_endpoint_auth_methods_supported:
+        token_endpoint_auth_methods_supported(config),
       require_pushed_authorization_requests: require_pushed_authorization_requests(config),
       pushed_authorization_request_endpoint: pushed_authorization_request_endpoint(config),
       scopes_supported: config.scopes_supported,
@@ -268,7 +271,19 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
       config.client_auth_signing_algs
     )
     |> put_authorization_signing_alg_values_supported()
+    |> put_introspection_signing_alg_values_supported()
     |> put_authorization_response_iss_supported(config)
+  end
+
+  # RFC 9701 §10 `introspection_signing_alg_values_supported`: the algorithms the
+  # introspection endpoint signs JWT responses with. Signed with the same key as
+  # ID Tokens and JARM, so the advertised set is exactly the already-derived
+  # id_token_signing_alg_values_supported.
+  defp put_introspection_signing_alg_values_supported(metadata) do
+    case Map.get(metadata, "id_token_signing_alg_values_supported") do
+      nil -> metadata
+      algs -> Map.put(metadata, "introspection_signing_alg_values_supported", algs)
+    end
   end
 
   # JARM §3 / FAPI 2.0 Message Signing §5.4 `authorization_signing_alg_values_

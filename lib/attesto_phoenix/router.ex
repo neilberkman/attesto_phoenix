@@ -17,6 +17,8 @@ defmodule AttestoPhoenix.Router do
     * `POST /oauth/token` - the token endpoint (RFC 6749 §3.2).
     * `POST /oauth/par` - pushed authorization requests (RFC 9126).
     * `POST /oauth/revoke` - the token revocation endpoint (RFC 7009 §2).
+    * `POST /oauth/introspect` - the token introspection endpoint (RFC 7662 §2),
+      with the RFC 9701 signed-JWT response negotiated by the `Accept` header.
     * `POST /oauth/register` - dynamic client registration (RFC 7591 §3.1),
       mounted only when registration is enabled (see `:registration` below).
     * `DELETE /oauth/register/:client_id` - dynamic client registration
@@ -102,6 +104,7 @@ defmodule AttestoPhoenix.Router do
   @token_path @oauth_prefix <> AttestoPhoenix.Config.token_tail()
   @par_path @oauth_prefix <> AttestoPhoenix.Config.par_tail()
   @revoke_path @oauth_prefix <> AttestoPhoenix.Config.revocation_tail()
+  @introspect_path @oauth_prefix <> AttestoPhoenix.Config.introspection_tail()
   @register_path @oauth_prefix <> AttestoPhoenix.Config.registration_tail()
   @userinfo_path @oauth_prefix <> AttestoPhoenix.Config.userinfo_tail()
 
@@ -115,6 +118,7 @@ defmodule AttestoPhoenix.Router do
   @token_controller AttestoPhoenix.Controller.TokenController
   @par_controller AttestoPhoenix.Controller.PARController
   @revocation_controller AttestoPhoenix.Controller.RevocationController
+  @introspection_controller AttestoPhoenix.Controller.IntrospectionController
   @registration_controller AttestoPhoenix.Controller.RegistrationController
   @userinfo_controller AttestoPhoenix.Controller.UserinfoController
 
@@ -141,6 +145,7 @@ defmodule AttestoPhoenix.Router do
     token_path = @token_path
     par_path = @par_path
     revoke_path = @revoke_path
+    introspect_path = @introspect_path
     register_path = @register_path
     userinfo_path = @userinfo_path
     discovery_controller = @discovery_controller
@@ -150,6 +155,7 @@ defmodule AttestoPhoenix.Router do
     token_controller = @token_controller
     par_controller = @par_controller
     revocation_controller = @revocation_controller
+    introspection_controller = @introspection_controller
     registration_controller = @registration_controller
     userinfo_controller = @userinfo_controller
 
@@ -213,6 +219,11 @@ defmodule AttestoPhoenix.Router do
         post(unquote(prefix <> token_path), unquote(token_controller), :create)
         post(unquote(prefix <> par_path), unquote(par_controller), :create)
         post(unquote(prefix <> revoke_path), unquote(revocation_controller), :create)
+
+        # RFC 7662 §2: token introspection is a POST endpoint that authenticates
+        # the client from the request (RFC 7662 §2.1); RFC 9701 adds the signed
+        # JWT response negotiated by the Accept header.
+        post(unquote(prefix <> introspect_path), unquote(introspection_controller), :create)
 
         unquote(registration_route)
 

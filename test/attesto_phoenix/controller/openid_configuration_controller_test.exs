@@ -151,6 +151,16 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationControllerTest do
                body["id_token_signing_alg_values_supported"]
     end
 
+    test "advertises the introspection endpoint, its auth methods, and signing algs (RFC 7662 / 9701)" do
+      body = call_show(host_config(), protocol_config()) |> decode_body()
+
+      assert body["introspection_endpoint"] == "#{@issuer}/oauth/introspect"
+      assert is_list(body["introspection_endpoint_auth_methods_supported"])
+
+      assert body["introspection_signing_alg_values_supported"] ==
+               body["id_token_signing_alg_values_supported"]
+    end
+
     test "advertises configured token endpoint auth methods" do
       host = host_config(token_endpoint_auth_methods_supported: ["private_key_jwt"])
 

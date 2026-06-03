@@ -172,6 +172,9 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
       scopes_supported: presence(config.scopes_supported),
       require_pushed_authorization_requests: require_pushed_authorization_requests(config),
       pushed_authorization_request_endpoint: pushed_authorization_request_endpoint(config),
+      introspection_endpoint: Config.introspection_endpoint_url(config),
+      introspection_endpoint_auth_methods_supported:
+        token_endpoint_auth_methods_supported(config),
       registration_endpoint: registration_endpoint(config)
     ]
   end
@@ -192,7 +195,18 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
       config.client_auth_signing_algs
     )
     |> put_authorization_signing_alg_values_supported(config)
+    |> put_introspection_signing_alg_values_supported(config)
     |> put_authorization_response_iss_supported(config)
+  end
+
+  # RFC 9701 §10 `introspection_signing_alg_values_supported`: the algorithms the
+  # introspection endpoint signs JWT responses with - the server's own signing
+  # keys, the same set used for ID Tokens and JARM. Omitted when none.
+  defp put_introspection_signing_alg_values_supported(metadata, %Config{keystore: keystore}) do
+    case SigningAlg.keystore_algs(keystore) do
+      [] -> metadata
+      algs -> Map.put(metadata, "introspection_signing_alg_values_supported", algs)
+    end
   end
 
   # JARM §3 / FAPI 2.0 Message Signing §5.4 `authorization_signing_alg_values_

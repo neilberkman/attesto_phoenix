@@ -14,12 +14,14 @@ you bring principals, keys, and policy.**
 
 `attesto` is a transport-agnostic library of OAuth/OIDC primitives: JWT access
 tokens, JWKS/key handling, DPoP, mTLS, PKCE, scope algebra, private-key client
-assertions, signed request objects, and the token-lifecycle building blocks.
+assertions, signed request objects, JARM response JWTs, token introspection
+primitives, and the token-lifecycle building blocks.
 `attesto_phoenix` wires those primitives into a running server:
 
 - HTTP endpoints (authorization, token, PAR, revocation, discovery, JWKS,
   UserInfo, optional dynamic registration) mounted into your router with one
-  macro.
+  macro. The authorization endpoint supports the default query response mode
+  and the JARM JWT response modes.
 - Protected-resource plugs that verify Bearer JWTs and enforce DPoP / mTLS
   sender-constraint binding.
 - Ecto-backed implementations of the attesto store behaviours for authorization
@@ -35,7 +37,7 @@ supplied through a small set of neutral configuration callbacks.
 | Concern | `attesto` (core) | `attesto_phoenix` (this package) |
 | --- | --- | --- |
 | JWT mint/verify, JWKS, DPoP, mTLS, PKCE, scopes | yes | reuses core |
-| `private_key_jwt`, signed request objects, token exchange primitives | yes | wires into endpoints |
+| `private_key_jwt`, signed request objects, JARM, token exchange primitives | yes | wires into endpoints |
 | Grant orchestration primitives | yes | reuses core |
 | HTTP endpoints + router macro | no | yes |
 | Protected-resource plugs | core plug building blocks | Phoenix-friendly wrappers |
@@ -65,7 +67,7 @@ Add `attesto_phoenix` to your dependencies:
 ```elixir
 def deps do
   [
-    {:attesto_phoenix, "~> 0.6"}
+    {:attesto_phoenix, "~> 0.7"}
   ]
 end
 ```
@@ -76,7 +78,7 @@ not a runtime dependency of this package:
 ```elixir
 def deps do
   [
-    {:attesto_phoenix, "~> 0.6"},
+    {:attesto_phoenix, "~> 0.7"},
     {:igniter, "~> 0.5", only: [:dev], runtime: false}
   ]
 end
@@ -119,25 +121,20 @@ config :my_app, AttestoPhoenix.Config,
   keystore: MyApp.Keystore,            # implements Attesto.Keystore
   repo: MyApp.Repo,                    # Ecto.Repo for the token stores
 
-  # client lookup + secret verification (you own the client registry)
-  load_client: &MyApp.Clients.fetch/1,
-  #   (client_id -> {:ok, client} | {:error, :not_found} | {:error, :revoked})
-  verify_client_secret: &MyApp.Clients.verify_secret/2,
-  #   (client, presented_secret -> boolean) -- constant time
-  client_jwks: &MyApp.Clients.jwks/1,
-  #   (client -> {:ok, jwks} | jwks), for private_key_jwt and request objects
-
-  # subject/principal resolution for protected-resource auth
-  load_principal: &MyApp.Principals.fetch/1,
-  #   (subject_id -> {:ok, principal} | {:error, :not_found})
+  # host policy modules (preferred install surface)
+  client_store: MyApp.OAuth.ClientStore,
+  principal_store: MyApp.OAuth.PrincipalStore,
+  scope_policy: MyApp.OAuth.ScopePolicy,
+  consent_policy: MyApp.OAuth.ConsentPolicy,
+  claims_provider: MyApp.OIDC.ClaimsProvider,
+  event_sink: MyApp.OAuth.Events,
 
   # --- optional policy ---
   scopes_supported: ["profile", "email", "read:*", "write:*"],
-  authorize_scope: &MyApp.Scopes.authorize/2,
-  #   (client, requested_scope -> {:ok, granted} | {:error, :invalid_scope})
-  on_event: &MyApp.Audit.record/1,     # (%AttestoPhoenix.Event{} -> any)
   send_error: &MyApp.OAuthErrors.render/3,
   #   (conn, status, body_map -> conn), optional custom OAuth error envelope
+  client_auth_signing_algs: Attesto.SigningAlg.fapi_algs(),
+  request_object_policy: Attesto.RequestObject.Policy.generic(),
 
   # --- optional deployment + features ---
   require_https: true,
@@ -148,7 +145,7 @@ config :my_app, AttestoPhoenix.Config,
   dpop_enabled: true,
   dpop_nonce_required: false,
   mtls_enabled: false,                 # if true, also set :cert_der
-  registration_enabled: false          # if true, also set :register_client
+  registration_enabled: false          # if true, also set registration callbacks
 ```
 
 Build the validated struct wherever you need it:
@@ -161,19 +158,31 @@ Required keys are validated at build time; a missing key (or a missing
 dependency such as `:cert_der` when mTLS is enabled) raises immediately so
 misconfiguration fails fast.
 
-### The callbacks, in OAuth terms
+### Host policy modules
 
-- **client lookup** -> `:load_client`
-- **client secret verification** -> `:verify_client_secret`
-- **client public keys** -> `:client_jwks`
-- **subject/principal resolution** -> `:load_principal`
-- **scope catalog / narrowing** -> `:scopes_supported` and/or `:authorize_scope`
-- **audit / telemetry** -> `:on_event` (optional, no-op by default)
-- **error envelope / transport rendering** -> `:send_error`,
-  `:www_authenticate`, `:no_store` (optional)
-- **dynamic client persistence** -> `:register_client` (only with registration)
-- **mTLS certificate extraction** -> `:cert_der` (only with mTLS)
-- **HTTPS / proxy trust** -> `:require_https` + `:trusted_proxies`
+The preferred install surface groups host-owned callbacks by concern:
+
+- **client registry** -> `:client_store`
+  (`load_client`, `verify_client_secret`, `client_jwks`, client metadata)
+- **principals** -> `:principal_store`
+  (`load_principal`, `build_principal`, principal kinds)
+- **scope policy** -> `:scope_policy`
+  (`authorize_scope`, supported scopes)
+- **login / consent** -> `:consent_policy`
+  (`authenticate_resource_owner`, `consent`)
+- **claims** -> `:claims_provider`
+  (`build_userinfo_claims/3`, `build_id_token_claims/4`)
+- **audit / telemetry** -> `:event_sink` (`on_event`)
+- **dynamic registration** -> `:registration` (only with registration)
+
+Flat callback keys such as `:load_client`, `:verify_client_secret`,
+`:client_jwks`, `:load_principal`, and `:authorize_scope` are still accepted and
+take precedence when present. Use them for small installs or targeted overrides;
+use behaviour modules for production wiring.
+
+Other deployment callbacks remain flat because they are endpoint mechanics, not
+domain policy: `:send_error`, `:www_authenticate`, `:no_store`, `:cert_der`,
+`:require_https`, and `:trusted_proxies`.
 
 ## Mounting the routes
 
@@ -216,6 +225,17 @@ and supports authorization-code, refresh-token, client-credentials, and OAuth
 token-exchange grants. The PAR endpoint accepts the same confidential-client
 secret methods plus `private_key_jwt`, then stores the authorization request
 behind a one-time `request_uri`.
+
+When `:request_object_policy` is configured, signed request objects are verified
+at PAR submission and re-verified at `/authorize`; verified request-object
+parameters are authoritative over unsigned request body/query values. Set
+`Attesto.RequestObject.Policy.fapi_message_signing/0` to enforce the FAPI 2.0
+Message Signing JAR profile.
+
+The authorization endpoint also emits JARM responses when the validated request
+uses `response_mode=jwt`, `query.jwt`, `fragment.jwt`, or `form_post.jwt`.
+Discovery advertises the supported response modes and the server signing
+algorithms used for authorization response JWTs.
 
 ## Protecting resources
 
