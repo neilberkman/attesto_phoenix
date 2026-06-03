@@ -335,6 +335,31 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
       assert body(conn)["error"] == "unsupported_grant_type"
     end
 
+    test "rejects a private_key_jwt assertion signed with an alg outside :client_auth_signing_algs" do
+      # The ES256 assertion authenticates by default, but configuring
+      # :client_auth_signing_algs to a set that excludes ES256 must reject it -
+      # proving the config value is threaded into ClientAssertion.verify.
+      client_key = JOSE.JWK.generate_key({:ec, "P-256"})
+      client_jwks = %{"keys" => [public_jwk(client_key)]}
+
+      put_config(
+        client_jwks: fn %{id: "confidential-1"} -> client_jwks end,
+        client_auth_signing_algs: ["EdDSA"]
+      )
+
+      assertion = client_assertion(client_key, "confidential-1")
+
+      conn =
+        post_token(%{
+          "grant_type" => "unsupported",
+          "client_assertion_type" => Attesto.ClientAssertion.assertion_type(),
+          "client_assertion" => assertion
+        })
+
+      assert conn.status == 400
+      assert body(conn)["error"] == "invalid_client"
+    end
+
     test "accepts private_key_jwt assertion audience set to issuer" do
       client_key = JOSE.JWK.generate_key({:ec, "P-256"})
       client_jwks = %{"keys" => [public_jwk(client_key)]}

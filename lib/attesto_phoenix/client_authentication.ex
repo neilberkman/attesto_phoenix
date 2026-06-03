@@ -72,11 +72,22 @@ defmodule AttestoPhoenix.ClientAuthentication do
     @type t :: %__MODULE__{
             allow_public: boolean(),
             assertion_audiences: [String.t()],
-            assertion_max_lifetime: pos_integer()
+            assertion_max_lifetime: pos_integer(),
+            assertion_signing_algs: [String.t()]
           }
 
-    @enforce_keys [:allow_public, :assertion_audiences, :assertion_max_lifetime]
-    defstruct [:allow_public, :assertion_audiences, :assertion_max_lifetime]
+    @enforce_keys [
+      :allow_public,
+      :assertion_audiences,
+      :assertion_max_lifetime,
+      :assertion_signing_algs
+    ]
+    defstruct [
+      :allow_public,
+      :assertion_audiences,
+      :assertion_max_lifetime,
+      :assertion_signing_algs
+    ]
   end
 
   defmodule Result do
@@ -322,7 +333,8 @@ defmodule AttestoPhoenix.ClientAuthentication do
          {:ok, jwks} <- client_jwks(config, client),
          {:ok, claims} <-
            ClientAssertion.verify(assertion, client_id, policy.assertion_audiences, jwks,
-             max_lifetime: policy.assertion_max_lifetime
+             max_lifetime: policy.assertion_max_lifetime,
+             accepted_algs: policy.assertion_signing_algs
            ),
          :ok <- consume_client_assertion_jti(config, policy, client_id, claims) do
       {:ok, result(config, client, :private_key_jwt)}

@@ -2,7 +2,7 @@ defmodule AttestoPhoenix.MixProject do
   @moduledoc false
   use Mix.Project
 
-  @version "0.7.0"
+  @version "0.7.1"
   @url "https://github.com/XukuLLC/attesto_phoenix"
   @maintainers ["Neil Berkman"]
 
@@ -49,7 +49,7 @@ defmodule AttestoPhoenix.MixProject do
       # Core OAuth2/OIDC primitives: Token, IDToken, DPoP, MTLS, Scope,
       # AuthorizationCode, AuthorizationRequest, RefreshToken, Discovery,
       # OpenIDDiscovery, the store behaviours, and the base plugs.
-      {:attesto, "~> 0.6.10"},
+      {:attesto, "~> 0.6.11"},
       # Ecto-backed CodeStore/RefreshStore/NonceStore/ReplayCheck + the migration
       # generator.
       {:ecto_sql, "~> 3.10"},

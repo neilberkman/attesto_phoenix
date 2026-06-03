@@ -67,7 +67,8 @@ defmodule AttestoPhoenix.Controller.PARController do
     policy = %Policy{
       allow_public: false,
       assertion_audiences: [config.issuer, Config.par_endpoint_url(config)],
-      assertion_max_lifetime: @client_assertion_max_lifetime
+      assertion_max_lifetime: @client_assertion_max_lifetime,
+      assertion_signing_algs: config.client_auth_signing_algs
     }
 
     case ClientAuthentication.authenticate(

@@ -161,7 +161,7 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
       response_modes_supported: @response_modes_supported,
       grant_types_supported: @grant_types_supported,
       token_endpoint_auth_methods_supported: token_endpoint_auth_methods_supported(config),
-      token_endpoint_auth_signing_alg_values_supported: Attesto.SigningAlg.fapi_algs(),
+      token_endpoint_auth_signing_alg_values_supported: config.client_auth_signing_algs,
       authorization_response_iss_parameter_supported:
         authorization_response_iss_parameter_supported(config),
       scopes_supported: presence(config.scopes_supported),
@@ -182,7 +182,10 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
 
   defp put_fapi_metadata(metadata, %Config{} = config) do
     metadata
-    |> Map.put("token_endpoint_auth_signing_alg_values_supported", Attesto.SigningAlg.fapi_algs())
+    |> Map.put(
+      "token_endpoint_auth_signing_alg_values_supported",
+      config.client_auth_signing_algs
+    )
     |> put_authorization_response_iss_supported(config)
   end
 

@@ -261,7 +261,8 @@ defmodule AttestoPhoenix.ClientAuthenticationTest do
     policy = %Policy{
       allow_public: Keyword.fetch!(opts, :allow_public),
       assertion_audiences: [config.issuer],
-      assertion_max_lifetime: 300
+      assertion_max_lifetime: 300,
+      assertion_signing_algs: config.client_auth_signing_algs || Attesto.SigningAlg.fapi_algs()
     }
 
     ClientAuthentication.authenticate(headers, params, config, policy)

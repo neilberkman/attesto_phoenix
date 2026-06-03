@@ -330,4 +330,15 @@ defmodule AttestoPhoenix.ConfigTest do
       end
     end
   end
+
+  describe ":client_auth_signing_algs" do
+    test "defaults to the FAPI 2 set when unset" do
+      assert config().client_auth_signing_algs == Attesto.SigningAlg.fapi_algs()
+    end
+
+    test "is overridable by the host" do
+      algs = ["PS256", "ES256", "RS256"]
+      assert config(client_auth_signing_algs: algs).client_auth_signing_algs == algs
+    end
+  end
 end

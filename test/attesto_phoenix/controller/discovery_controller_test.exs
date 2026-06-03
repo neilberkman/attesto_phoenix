@@ -122,6 +122,17 @@ defmodule AttestoPhoenix.Controller.DiscoveryControllerTest do
                Attesto.SigningAlg.fapi_algs()
     end
 
+    test "advertised signing algorithms reflect a configured :client_auth_signing_algs" do
+      # The advertised metadata and the verification policy read the same Config
+      # value, so they cannot drift: configuring the set changes discovery too.
+      algs = ["PS256", "ES256", "RS256"]
+
+      body =
+        call_show(host_config(client_auth_signing_algs: algs), protocol_config()) |> decode_body()
+
+      assert body["token_endpoint_auth_signing_alg_values_supported"] == algs
+    end
+
     test "advertises RFC 9207 authorization response iss support when enabled" do
       host = host_config(authorization_response_iss: true)
 

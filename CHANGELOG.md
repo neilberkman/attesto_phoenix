@@ -6,6 +6,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-06-03
+
+### Added
+
+- `:client_auth_signing_algs` Config key — the JOSE algorithms accepted for
+  `private_key_jwt` client-assertion signatures, threaded into
+  `Attesto.ClientAssertion.verify/5` (via its `:accepted_algs` opt) and also
+  rendered as `token_endpoint_auth_signing_alg_values_supported` in discovery.
+  Defaults to `Attesto.SigningAlg.fapi_algs/0` (PS256, ES256, EdDSA), so
+  behaviour is unchanged unless a host overrides it. Verification and the
+  advertised metadata now read this one value and cannot drift. Requires
+  `attesto ~> 0.6.11`.
+
 ## [0.7.0] - 2026-06-03
 
 A structural refactor of the token/PAR controllers into a reusable

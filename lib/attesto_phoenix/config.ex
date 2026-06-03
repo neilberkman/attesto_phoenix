@@ -150,6 +150,12 @@ defmodule AttestoPhoenix.Config do
   ### Optional values (with defaults)
 
     * `:audience` - default access-token audience (string or list).
+    * `:client_auth_signing_algs` - the JOSE algorithms accepted for
+      `private_key_jwt` client-assertion signatures, and the set advertised as
+      `token_endpoint_auth_signing_alg_values_supported` in discovery. Defaults
+      to `Attesto.SigningAlg.fapi_algs/0` (PS256, ES256, EdDSA). A non-FAPI
+      deployment can widen it; verification and the advertised metadata stay in
+      lockstep because both read this one value.
     * `:scopes_supported` - list of supported scope strings (concrete and
       wildcard) advertised in discovery and used as the default scope catalog.
       For an OpenID Provider the reserved `openid` scope (OpenID Connect Core
@@ -322,6 +328,7 @@ defmodule AttestoPhoenix.Config do
     :event_sink,
     :registration,
     :claims_provider,
+    :client_auth_signing_algs,
     :audience,
     :authorize_scope,
     :on_event,
@@ -410,6 +417,7 @@ defmodule AttestoPhoenix.Config do
           event_sink: module() | nil,
           registration: module() | nil,
           claims_provider: module() | nil,
+          client_auth_signing_algs: [String.t()] | nil,
           audience: String.t() | [String.t()] | nil,
           authorize_scope: callback() | nil,
           on_event: callback() | nil,
@@ -494,8 +502,19 @@ defmodule AttestoPhoenix.Config do
   def new(opts) when is_list(opts), do: opts |> Map.new() |> new()
 
   def new(opts) when is_map(opts) do
-    config = struct!(__MODULE__, opts)
-    validate!(config)
+    __MODULE__
+    |> struct!(opts)
+    |> apply_defaults()
+    |> validate!()
+  end
+
+  # Defaults that cannot be static struct values (they call a function).
+  defp apply_defaults(%__MODULE__{} = config) do
+    %{
+      config
+      | client_auth_signing_algs:
+          config.client_auth_signing_algs || Attesto.SigningAlg.fapi_algs()
+    }
   end
 
   @doc """
