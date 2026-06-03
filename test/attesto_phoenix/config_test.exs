@@ -109,7 +109,7 @@ defmodule AttestoPhoenix.ConfigTest do
   # required capabilities (load_client, verify_client_secret, load_principal)
   # must be satisfied by installed behaviour modules. Exercises the real
   # `Config.new/1` boot surface, not `struct/2`.
-  defp behaviour_only_config(overrides \\ []) do
+  defp behaviour_only_config(overrides) do
     base = [
       issuer: "https://issuer.example",
       keystore: __MODULE__.Keystore,

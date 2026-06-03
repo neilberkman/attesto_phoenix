@@ -80,6 +80,14 @@ defmodule AttestoPhoenix.Config do
       list of scopes on the access token; `requested_claims` is the per-claim
       request map from the OpenID Connect `claims` parameter (`%{}` when none).
       Required only when the UserInfo endpoint is mounted.
+    * `:build_id_token_claims` - `(client, subject, granted_scopes,
+      requested_claims -> claims_map)`. Produces the host claims merged into an
+      ID Token (OpenID Connect Core §3.1.3.6 / §5.5 `id_token` member). Distinct
+      from `:build_userinfo_claims`: it receives the resolved `client`, draws
+      from the `claims` parameter's `id_token` member, and MUST NOT carry `sub`
+      (the library sets the verified subject; a host-supplied `sub` is rejected
+      by `Attesto.IDToken`). Optional - when unset the ID Token carries only the
+      protocol claims.
     * `:client_id` - `(client -> String.t())`. Extracts the OAuth client
       identifier from the host's client struct.
     * `:client_jwks` - `(client -> jwks)`. Returns the client's trusted public
@@ -328,6 +336,7 @@ defmodule AttestoPhoenix.Config do
     :principal_kinds,
     :build_principal,
     :build_userinfo_claims,
+    :build_id_token_claims,
     :client_id,
     :client_jwks,
     :client_redirect_uris,
@@ -416,6 +425,7 @@ defmodule AttestoPhoenix.Config do
           principal_kinds: [Attesto.PrincipalKind.t()] | callback() | nil,
           build_principal: callback() | nil,
           build_userinfo_claims: callback() | nil,
+          build_id_token_claims: callback() | nil,
           client_id: callback() | nil,
           client_jwks: callback() | nil,
           client_redirect_uris: callback() | nil,
@@ -746,7 +756,8 @@ defmodule AttestoPhoenix.Config do
     unregister_client: {:registration, :unregister_client, 1},
     client_registration_access_token_hash:
       {:registration, :client_registration_access_token_hash, 1},
-    build_userinfo_claims: {:claims_provider, :build_userinfo_claims, 3}
+    build_userinfo_claims: {:claims_provider, :build_userinfo_claims, 3},
+    build_id_token_claims: {:claims_provider, :build_id_token_claims, 4}
   }
 
   # The behaviour-module Config keys, each paired with the behaviour module it

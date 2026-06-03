@@ -29,11 +29,13 @@ defmodule AttestoPhoenix.AuthorizationServer.PAR do
 
   ## Security details preserved
 
-    * The stored record always carries the authenticated `client_id` resolved
-      through the host's `:client_id` callback (RFC 6749 §2.2), never a
-      body-supplied value, and the client-authentication credentials
-      (`client_secret`, `client_assertion`, `client_assertion_type`) are dropped
-      before storage.
+    * The stored record carries the authenticated `client_id` resolved through
+      the host's `:client_id` callback (RFC 6749 §2.2), overriding any
+      body-supplied value. When no `:client_id` callback is configured the
+      request's own presented `client_id` is left intact (not clobbered with
+      `nil`); the library makes no assumption about the opaque client shape. The
+      client-authentication credentials (`client_secret`, `client_assertion`,
+      `client_assertion_type`) are dropped before storage.
     * RFC 9449: when a `DPoP` proof is presented at the PAR endpoint, it is
       verified against the canonical request URL/method (RFC 9449 §4.2 / §4.3)
       with the configured replay check, and its `jkt` is stored as the
@@ -100,7 +102,7 @@ defmodule AttestoPhoenix.AuthorizationServer.PAR do
         params
         |> Map.drop(["client_secret", "client_assertion", "client_assertion_type"])
         |> put_verified_dpop_jkt(dpop_jkt)
-        |> Map.put("client_id", client_id(config, client))
+        |> put_resolved_client_id(client_id(config, client))
 
       case par_store(config).put(request_uri, stored, ttl) do
         :ok ->
@@ -163,13 +165,21 @@ defmodule AttestoPhoenix.AuthorizationServer.PAR do
   defp replay_check(%Config{replay_check: nil}), do: &ReplayCache.check_and_record/2
   defp replay_check(%Config{replay_check: callback}), do: callback
 
-  # The client's identifier (RFC 6749 §2.2). Read defensively through the
-  # host's `:client_id` callback; when none is configured the identifier is
-  # unknown (`nil`), matching the resolution used everywhere else in the
-  # library.
+  # The client's identifier (RFC 6749 §2.2), resolved through the host's
+  # `:client_id` callback. When no `:client_id` callback is configured the
+  # identifier cannot be derived from the opaque client struct (`nil`), matching
+  # the resolution used everywhere else in the library.
   defp client_id(config, client) do
     Callback.invoke(Config.client_id_fun(config), [client], nil)
   end
+
+  # Store the authenticated `client_id` when it resolves. When it does not (no
+  # `:client_id` callback), leave the request's own presented `client_id`
+  # intact rather than clobbering it with `nil`. The prior
+  # `client[:id]`/`client["id"]` struct-shape fallback is intentionally gone -
+  # the library makes no assumption about the opaque host client shape.
+  defp put_resolved_client_id(params, nil), do: params
+  defp put_resolved_client_id(params, client_id), do: Map.put(params, "client_id", client_id)
 
   defp par_store(config), do: config_field(config, :par_store, AttestoPhoenix.Store.PAR.ETS)
 

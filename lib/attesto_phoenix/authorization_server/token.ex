@@ -491,12 +491,12 @@ defmodule AttestoPhoenix.AuthorizationServer.Token do
     # OIDC Core §5.4/§5.5: host userinfo / claims-param-requested claims ride
     # in as `Attesto.IDToken.mint/4`'s `:extra_claims`, where the protocol
     # claims stay authoritative (a collision is rejected, never shadowed).
-    |> put_optional_kw(:extra_claims, userinfo_claims(config, client, grant, scope))
+    |> put_optional_kw(:extra_claims, id_token_extra_claims(config, client, grant, scope))
   end
 
   # OIDC Core §5.4 / §5.5: the additional identity claims an ID Token may
   # carry (e.g. `email`, `name`) are the host's to source - this library knows
-  # no user store. The host's `:build_userinfo_claims` callback is given the
+  # no user store. The host's `:build_id_token_claims` callback is given the
   # client, the authenticated `subject`, the granted `scope`, and the OIDC
   # `claims` request parameter the authorization endpoint stashed on the code
   # (OIDC Core §5.5, the claims-param-requested claims), and returns a map of
@@ -507,8 +507,8 @@ defmodule AttestoPhoenix.AuthorizationServer.Token do
   # by `put_optional_kw/3`), and a callback that does not return a non-empty
   # map is treated the same (fail-closed: no claims rather than a crash or a
   # malformed token).
-  defp userinfo_claims(config, client, grant, scope) do
-    case Config.build_userinfo_claims_fun(config) do
+  defp id_token_extra_claims(config, client, grant, scope) do
+    case Config.build_id_token_claims_fun(config) do
       nil ->
         nil
 

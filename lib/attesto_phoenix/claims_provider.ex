@@ -17,11 +17,20 @@ defmodule AttestoPhoenix.ClaimsProvider do
   callback individually (an anonymous function, a `{module, function}` pair, or
   a `{module, function, extra_args}` triple).
 
-  The `@callback` corresponds to the identically named `AttestoPhoenix.Config`
+  Each `@callback` corresponds to the identically named `AttestoPhoenix.Config`
   key:
 
-    * `build_userinfo_claims/3` (`:build_userinfo_claims`)
+    * `build_userinfo_claims/3` (`:build_userinfo_claims`) - the UserInfo source.
+    * `build_id_token_claims/4` (`:build_id_token_claims`) - the ID Token source.
+
+  These are deliberately separate callbacks, not one overloaded function: the
+  UserInfo endpoint and the ID Token draw from different `claims`-parameter
+  members and treat `sub` differently, so a host implements whichever surface(s)
+  it serves.
   """
+
+  @typedoc "The host's opaque client representation (e.g. an Ecto struct)."
+  @type client :: term()
 
   @doc """
   Produce the claim values the UserInfo endpoint (OpenID Connect Core §5.3)
@@ -40,9 +49,26 @@ defmodule AttestoPhoenix.ClaimsProvider do
               requested_claims :: map()
             ) :: map()
 
-  # Optional on the behaviour: a host that installs `:claims_provider` but omits
-  # this callback resolves to nil and the UserInfo claim source fails closed at
-  # use, matching the boot-validation policy (`claims_provider` has no required
-  # callbacks). An installed module need not export it to compile cleanly.
-  @optional_callbacks build_userinfo_claims: 3
+  @doc """
+  Produce the host claims merged into an ID Token (OpenID Connect Core §3.1.3.6
+  / §5.5 `id_token` member).
+
+  Receives the resolved `client`, the subject identifier, the granted scopes,
+  and the per-claim request map. Distinct from `build_userinfo_claims/3`: it
+  draws from the `claims` parameter's `id_token` member and MUST NOT carry `sub`
+  (the library sets the verified subject; a host-supplied `sub` is rejected by
+  `Attesto.IDToken`). Returns a map of claim values.
+  """
+  @callback build_id_token_claims(
+              client(),
+              subject :: String.t(),
+              granted_scopes :: [String.t()],
+              requested_claims :: map()
+            ) :: map()
+
+  # Both optional on the behaviour: a host installs `:claims_provider` and
+  # implements whichever surface(s) it serves; an omitted callback resolves to
+  # nil and that claim source fails closed at use, matching the boot-validation
+  # policy (`claims_provider` has no required callbacks).
+  @optional_callbacks build_userinfo_claims: 3, build_id_token_claims: 4
 end

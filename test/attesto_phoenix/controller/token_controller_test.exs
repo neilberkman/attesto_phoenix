@@ -1399,10 +1399,10 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
       assert is_binary(body(conn)["refresh_token"])
     end
 
-    # OIDC Core §5.4 / §5.5: host-sourced userinfo and claims-param-requested
-    # claims are carried into the ID Token via the `:build_userinfo_claims`
-    # callback, while the standard protocol claims still win.
-    test "carries host userinfo and claims-param-requested claims into the id_token" do
+    # OIDC Core §5.4 / §5.5: host-sourced ID Token claims and claims-param-
+    # requested claims are carried into the ID Token via the
+    # `:build_id_token_claims` callback, while the standard protocol claims win.
+    test "carries host id_token and claims-param-requested claims into the id_token" do
       enable_minting()
 
       code_store =
@@ -1412,7 +1412,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
         code_store: code_store,
         # The host's claim source: a fixed email plus any top-level claim the
         # OIDC `claims` request parameter asked for under `id_token`.
-        build_userinfo_claims: fn _client, subject, _scope, requested ->
+        build_id_token_claims: fn _client, subject, _scope, requested ->
           base = %{"email" => "#{subject}@example.test"}
 
           extra =
@@ -1445,7 +1445,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
       assert claims["aud"] == "public-1"
     end
 
-    test "an id_token carries no extra claims when no :build_userinfo_claims is configured" do
+    test "an id_token carries no extra claims when no :build_id_token_claims is configured" do
       enable_minting()
       code_store = start_openid_code_store(["openid"], %{})
       put_config(code_store: code_store)
