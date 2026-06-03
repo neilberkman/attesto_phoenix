@@ -44,12 +44,23 @@ defmodule AttestoPhoenix.MixProject do
   defp elixirc_paths(:test), do: ["lib", "test/support"]
   defp elixirc_paths(_), do: ["lib"]
 
+  # Develop against the sibling attesto checkout when present (dev/test), so the
+  # two libraries can be co-developed before a release; prod/Hex builds use the
+  # published version constraint. Mirrors the cert example's dependency wiring.
+  defp attesto_dep do
+    if Mix.env() in [:dev, :test] and File.dir?("../attesto") do
+      {:attesto, path: "../attesto"}
+    else
+      {:attesto, "~> 0.6.12"}
+    end
+  end
+
   defp deps do
     [
       # Core OAuth2/OIDC primitives: Token, IDToken, DPoP, MTLS, Scope,
       # AuthorizationCode, AuthorizationRequest, RefreshToken, Discovery,
       # OpenIDDiscovery, the store behaviours, and the base plugs.
-      {:attesto, "~> 0.6.12"},
+      attesto_dep(),
       # Ecto-backed CodeStore/RefreshStore/NonceStore/ReplayCheck + the migration
       # generator.
       {:ecto_sql, "~> 3.10"},

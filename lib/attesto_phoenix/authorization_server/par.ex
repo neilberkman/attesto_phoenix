@@ -219,9 +219,7 @@ defmodule AttestoPhoenix.AuthorizationServer.PAR do
        when is_binary(request) and request != "" do
     opts =
       [issuer: client_id(config, client), audience: config.issuer] ++
-        RequestObject.Policy.to_verify_opts(
-          config.request_object_policy || %RequestObject.Policy{}
-        )
+        RequestObject.Policy.to_verify_opts(request_object_policy(config))
 
     case RequestObject.verify(request, client_jwks(config, client) || %{"keys" => []}, opts) do
       {:ok, object_params} ->
@@ -232,7 +230,23 @@ defmodule AttestoPhoenix.AuthorizationServer.PAR do
     end
   end
 
-  defp verify_request_object(_config, _client, params), do: {:ok, params}
+  # No `request` object pushed. FAPI 2.0 Message Signing §5.3.1: when the
+  # configured policy requires a signed request object, a PAR carrying none is
+  # rejected here (RFC 9126 §2.3 invalid_request) rather than stored as a plain
+  # request; otherwise the pushed plain parameters stand (generic OIDC §6.1).
+  defp verify_request_object(config, _client, params) do
+    if RequestObject.Policy.require_request_object?(request_object_policy(config)) do
+      {:error,
+       error(
+         @error_invalid_request,
+         "pushed authorization request must use a signed request object"
+       )}
+    else
+      {:ok, params}
+    end
+  end
+
+  defp request_object_policy(config), do: config.request_object_policy || %RequestObject.Policy{}
 
   # Resolve the client's trusted JWK set, mirroring the authorize controller's
   # resolution (the host's `:client_jwks` callback, returning a JWKS or `nil`).

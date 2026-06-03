@@ -6,6 +6,7 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationControllerTest do
 
   alias Attesto.Config, as: ProtocolConfig
   alias Attesto.PrincipalKind
+  alias Attesto.RequestObject.Policy
   alias AttestoPhoenix.Config
   alias AttestoPhoenix.Controller.OpenIDConfigurationController
 
@@ -161,6 +162,31 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationControllerTest do
       body = call_show(host_config(), protocol_config()) |> decode_body()
 
       assert body["request_uri_parameter_supported"] == false
+    end
+
+    test "advertises request_object_signing_alg_values_supported (RFC 9101 §10.5)" do
+      # Default policy leaves accepted_algs unset, so the verifier default
+      # (PS256, ES256, EdDSA) is advertised.
+      body = call_show(host_config(), protocol_config()) |> decode_body()
+
+      assert body["request_object_signing_alg_values_supported"] == ["PS256", "ES256", "EdDSA"]
+    end
+
+    test "omits require_signed_request_object under the default policy (RFC 9101 §10.5)" do
+      body = call_show(host_config(), protocol_config()) |> decode_body()
+
+      refute Map.has_key?(body, "require_signed_request_object")
+    end
+
+    test "advertises require_signed_request_object=true under the FAPI Message Signing policy" do
+      body =
+        call_show(
+          host_config(request_object_policy: Policy.fapi_message_signing()),
+          protocol_config()
+        )
+        |> decode_body()
+
+      assert body["require_signed_request_object"] == true
     end
 
     test "advertises claims_parameter_supported=false by default (OIDC Discovery §3)" do

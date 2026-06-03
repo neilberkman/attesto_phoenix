@@ -526,6 +526,40 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
       assert JSON.decode!(conn.resp_body)["error"] == "invalid_request_object"
     end
 
+    test "FAPI policy rejects a PAR that carries no signed request object" do
+      # FAPI 2.0 Message Signing §5.3.1: the profile mandates a signed request
+      # object, so a plain PAR (parameters in the body, no `request`) is rejected
+      # at the PAR endpoint rather than stored as a plain pushed request.
+      put_config(request_object_policy: Policy.fapi_message_signing())
+
+      params = auth_params()
+      credentials = Base.encode64("confidential-1:s3cr3t")
+
+      conn =
+        :post
+        |> conn(@endpoint_path, params)
+        |> Plug.Conn.put_req_header("authorization", "Basic " <> credentials)
+        |> PARController.create(params)
+
+      assert conn.status == 400
+      assert JSON.decode!(conn.resp_body)["error"] == "invalid_request"
+    end
+
+    test "the default (generic) policy still stores a plain PAR with no request object" do
+      # Generic OpenID Connect §6.1: signed request objects are optional, so a
+      # plain PAR remains valid and is stored.
+      params = auth_params()
+      credentials = Base.encode64("confidential-1:s3cr3t")
+
+      conn =
+        :post
+        |> conn(@endpoint_path, params)
+        |> Plug.Conn.put_req_header("authorization", "Basic " <> credentials)
+        |> PARController.create(params)
+
+      assert conn.status == 201
+    end
+
     test "stores the verified request-object params, not the unsigned body params (RFC 9101 §6.3)" do
       request_key = JOSE.JWK.generate_key({:ec, "P-256"})
 

@@ -68,6 +68,8 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
   import Plug.Conn, only: [put_resp_header: 3]
 
   alias Attesto.OpenIDDiscovery
+  alias Attesto.RequestObject.Policy
+  alias Attesto.SigningAlg
   alias AttestoPhoenix.Config
 
   # The router pipeline installs the AttestoPhoenix.Config here. This is the
@@ -211,6 +213,12 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
       request_parameter_supported: @request_parameter_supported,
       request_uri_parameter_supported: @request_uri_parameter_supported,
       claims_parameter_supported: config.claims_parameter_supported,
+      # RFC 9101 §10.5 / FAPI 2.0 Message Signing §5.3.1: the request-object
+      # signing algorithms accepted, and (only when the policy mandates it) that
+      # signed request objects are required. Both derive from the configured
+      # request_object_policy, so discovery never drifts from enforcement.
+      request_object_signing_alg_values_supported: request_object_signing_algs(config),
+      require_signed_request_object: require_signed_request_object(config),
       # Host catalogs: advertised only when the host configures a non-empty list
       # (the core builder drops the nil the helper returns for `[]`).
       acr_values_supported: presence(config.acr_values_supported),
@@ -226,6 +234,29 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
 
   defp token_endpoint_auth_methods_supported(%Config{}),
     do: @token_endpoint_auth_methods_supported
+
+  # RFC 9101 §10.5 / OpenID Connect Discovery §3
+  # `request_object_signing_alg_values_supported`: the JWS algorithms the
+  # authorization endpoint accepts on a signed request object. Mirrors the
+  # configured request_object_policy's accepted_algs, falling back to the
+  # verifier's own default (Attesto.SigningAlg.fapi_algs/0: PS256, ES256, EdDSA)
+  # when the policy leaves it unset.
+  defp request_object_signing_algs(%Config{} = config) do
+    case request_object_policy(config).accepted_algs do
+      algs when is_list(algs) and algs != [] -> algs
+      _ -> SigningAlg.fapi_algs()
+    end
+  end
+
+  # RFC 9101 §10.5 `require_signed_request_object`: advertise `true` only when
+  # the policy mandates a signed request object (FAPI 2.0 Message Signing
+  # §5.3.1); otherwise omit the member (its default is false).
+  defp require_signed_request_object(%Config{} = config) do
+    if Policy.require_request_object?(request_object_policy(config)), do: true, else: nil
+  end
+
+  defp request_object_policy(%Config{request_object_policy: %Policy{} = policy}), do: policy
+  defp request_object_policy(%Config{}), do: %Policy{}
 
   defp put_fapi_metadata(metadata, %Config{} = config) do
     metadata
