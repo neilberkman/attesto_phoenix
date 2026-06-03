@@ -108,8 +108,12 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
     refute Map.has_key?(stored, "client_secret")
   end
 
-  test "stores the authenticated client_id instead of a body-supplied client_id" do
-    params = Map.put(auth_params(), "client_id", "body-supplied-client")
+  test "stores the authenticated client_id when a redundant matching client_id is in the body" do
+    # RFC 6749 §2.3.1: the Basic userid is the authoritative client_id; a body
+    # client_id is mere identification and is honoured only when it agrees.
+    # The stored record always carries the authenticated client_id, never a
+    # body-supplied value.
+    params = Map.put(auth_params(), "client_id", "confidential-1")
     credentials = Base.encode64("confidential-1:s3cr3t")
 
     conn =
@@ -122,6 +126,22 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
     body = JSON.decode!(conn.resp_body)
     assert {:ok, stored, 45} = PARStore.lookup(body["request_uri"])
     assert stored["client_id"] == "confidential-1"
+  end
+
+  test "rejects a body client_id that conflicts with the Basic credentials (RFC 6749 §2.3.1)" do
+    # An internally inconsistent request: a body client_id that disagrees with
+    # the authoritative Basic userid is rejected before any secret verification.
+    params = Map.put(auth_params(), "client_id", "body-supplied-client")
+    credentials = Base.encode64("confidential-1:s3cr3t")
+
+    conn =
+      :post
+      |> conn(@endpoint_path, params)
+      |> Plug.Conn.put_req_header("authorization", "Basic " <> credentials)
+      |> PARController.create(params)
+
+    assert conn.status == 400
+    assert JSON.decode!(conn.resp_body)["error"] == "invalid_request"
   end
 
   test "uses the default ETS PAR store when par_store is unset" do

@@ -82,11 +82,12 @@ if Code.ensure_loaded?(Plug.Conn) do
     @type t :: %__MODULE__{
             error: atom(),
             error_description: String.t() | nil,
-            status: pos_integer()
+            status: pos_integer(),
+            headers: [{String.t(), String.t()}]
           }
 
     @enforce_keys [:error, :status]
-    defstruct [:error, :error_description, :status]
+    defstruct [:error, :error_description, :status, headers: []]
 
     # RFC 6749 §5.1: token responses MUST NOT be cached by any intermediary.
     @cache_control_no_store "no-store"
@@ -139,14 +140,18 @@ if Code.ensure_loaded?(Plug.Conn) do
     `code` is the error code atom (e.g. `:invalid_request`, `:invalid_client`).
     `description` is the human-readable `error_description` (or `nil`). The
     HTTP status defaults from the RFC 6749 §5.2 mapping for `code` and can be
-    overridden with the `:status` option.
+    overridden with the `:status` option. The `:headers` option carries extra
+    response headers a caller must emit alongside the error (e.g. the
+    RFC 9449 §8 `DPoP-Nonce` header on a `use_dpop_nonce` error); it defaults
+    to `[]`.
     """
     @spec new(atom(), String.t() | nil, keyword()) :: t()
     def new(code, description \\ nil, opts \\ []) when is_atom(code) do
       %__MODULE__{
         error: code,
         error_description: description,
-        status: Keyword.get(opts, :status, default_status(code))
+        status: Keyword.get(opts, :status, default_status(code)),
+        headers: Keyword.get(opts, :headers, [])
       }
     end
 

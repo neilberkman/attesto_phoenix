@@ -261,9 +261,50 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
       assert body(conn)["error"] == "unsupported_grant_type"
     end
 
-    test "rejects credentials presented by both Basic and body (RFC 6749 §2.3)" do
+    test "accepts a redundant body client_id matching the Basic credentials (RFC 6749 §2.3.1)" do
+      # A bare body `client_id` is identification (RFC 6749 §2.3.1), not a
+      # second authentication method. When it matches the Basic userid the
+      # request is internally consistent and authenticates via the Basic
+      # secret; only the unsupported grant type is rejected downstream.
       credentials = Base.encode64("confidential-1:s3cr3t")
-      params = %{"grant_type" => "client_credentials", "client_id" => "confidential-1"}
+      params = %{"grant_type" => "unsupported", "client_id" => "confidential-1"}
+
+      conn =
+        :post
+        |> conn(@endpoint_path, params)
+        |> put_req_header("authorization", "Basic " <> credentials)
+        |> TokenController.create(params)
+
+      assert body(conn)["error"] == "unsupported_grant_type"
+    end
+
+    test "rejects a body client_id that conflicts with the Basic credentials (RFC 6749 §2.3.1)" do
+      # A body `client_id` that disagrees with the authoritative Basic userid
+      # is an internally inconsistent request and is rejected before any
+      # secret verification.
+      credentials = Base.encode64("confidential-1:s3cr3t")
+      params = %{"grant_type" => "client_credentials", "client_id" => "someone-else"}
+
+      conn =
+        :post
+        |> conn(@endpoint_path, params)
+        |> put_req_header("authorization", "Basic " <> credentials)
+        |> TokenController.create(params)
+
+      assert conn.status == 400
+      assert body(conn)["error"] == "invalid_request"
+    end
+
+    test "rejects two credentials presented by both Basic and body (RFC 6749 §2.3)" do
+      # A body `client_secret` alongside Basic is genuine double authentication
+      # (two credentials), which RFC 6749 §2.3 forbids.
+      credentials = Base.encode64("confidential-1:s3cr3t")
+
+      params = %{
+        "grant_type" => "client_credentials",
+        "client_id" => "confidential-1",
+        "client_secret" => "s3cr3t"
+      }
 
       conn =
         :post

@@ -106,9 +106,9 @@ defmodule AttestoPhoenix.Controller.TokenController do
 
   import Plug.Conn
 
-  alias Attesto.{AuthorizationCode, ClientAssertion, IDToken, MTLS, RefreshToken, Token}
-  alias Attesto.DPoP.ReplayCache
-  alias AttestoPhoenix.{Callback, Config, Event, RequestContext}
+  alias Attesto.{AuthorizationCode, IDToken, MTLS, RefreshToken, Token}
+  alias AttestoPhoenix.{Callback, ClientAuthentication, Config, Event, OAuthError, RequestContext}
+  alias AttestoPhoenix.ClientAuthentication.Policy
 
   require Logger
 
@@ -142,11 +142,6 @@ defmodule AttestoPhoenix.Controller.TokenController do
   # RFC 7523 / OIDC Core §9: client assertions are short-lived JWTs, but their
   # `jti` still has to be consumed once by the authorization server.
   @client_assertion_max_lifetime 300
-
-  # Generic, non-revealing message for any failure on the client
-  # authentication path (RFC 6749 §2.3): an attacker must not be able to tell
-  # an unknown client from a wrong secret.
-  @client_auth_failed "client authentication failed"
 
   @doc """
   Token endpoint action (RFC 6749 §3.2).
@@ -244,210 +239,29 @@ defmodule AttestoPhoenix.Controller.TokenController do
 
   # ── Client authentication (RFC 6749 §2.3) ────────────────────────────────
 
+  # RFC 6749 §2.3: client authentication is delegated to the conn-free core
+  # `AttestoPhoenix.ClientAuthentication`, shared with the PAR endpoint. The
+  # token endpoint's policy: a body `client_id` without a secret is the
+  # public-client path (RFC 6749 §2.1), so `allow_public: true`; client
+  # assertions are audienced to the issuer (FAPI 2 / RFC 7523 §3) and live at
+  # most `@client_assertion_max_lifetime` seconds (RFC 7523 §3).
   defp authenticate_client(config, conn, params) do
-    case fetch_client_credentials(conn, params) do
-      {:ok, :none, client_id} ->
-        # RFC 6749 §2.1: identified but unauthenticated. Permitted only for
-        # public clients, which must compensate with PKCE (RFC 7636).
-        with :ok <- require_client_auth_method(config, "none") do
-          load_public_client(config, client_id)
-        end
+    policy = %Policy{
+      allow_public: true,
+      assertion_audiences: [config.issuer],
+      assertion_max_lifetime: @client_assertion_max_lifetime
+    }
 
-      {:ok, :client_secret_basic, client_id, secret} ->
-        with :ok <- require_client_auth_method(config, "client_secret_basic") do
-          verify_confidential_client(config, client_id, secret)
-        end
-
-      {:ok, :client_secret_post, client_id, secret} ->
-        with :ok <- require_client_auth_method(config, "client_secret_post") do
-          verify_confidential_client(config, client_id, secret)
-        end
-
-      {:ok, :private_key_jwt, assertion} ->
-        with :ok <- require_client_auth_method(config, "private_key_jwt") do
-          verify_private_key_jwt_client(config, assertion)
-        end
-
-      {:error, _} = err ->
-        err
+    case ClientAuthentication.authenticate(
+           get_req_header(conn, "authorization"),
+           params,
+           config,
+           policy
+         ) do
+      {:ok, %ClientAuthentication.Result{client: client}} -> {:ok, client}
+      {:error, %OAuthError{}} = err -> err
     end
   end
-
-  # RFC 6749 §2.3: a client MUST NOT use more than one authentication method.
-  defp fetch_client_credentials(conn, params) do
-    header = get_req_header(conn, "authorization")
-
-    cond do
-      assertion_credentials?(params) ->
-        fetch_assertion_credentials(header, params)
-
-      basic_credentials?(header) ->
-        fetch_basic_credentials(header, params)
-
-      header == [] ->
-        fetch_body_credentials(params)
-
-      true ->
-        {:error, error(@error_invalid_client, "unsupported client authentication scheme")}
-    end
-  end
-
-  defp assertion_credentials?(%{"client_assertion" => assertion})
-       when is_binary(assertion) and assertion != "",
-       do: true
-
-  defp assertion_credentials?(_params), do: false
-
-  defp basic_credentials?(["Basic " <> _]), do: true
-  defp basic_credentials?(_header), do: false
-
-  defp fetch_assertion_credentials(header, params) do
-    if header != [] or has_body_secret?(params) do
-      {:error, error(@error_invalid_request, "multiple client authentication methods")}
-    else
-      fetch_private_key_jwt_credentials(
-        params["client_assertion_type"],
-        params["client_assertion"]
-      )
-    end
-  end
-
-  defp fetch_basic_credentials(["Basic " <> _encoded], %{"client_id" => client_id})
-       when is_binary(client_id) and client_id != "" do
-    {:error, error(@error_invalid_request, "multiple client authentication methods")}
-  end
-
-  defp fetch_basic_credentials(["Basic " <> encoded], _params),
-    do: decode_basic_credentials(encoded)
-
-  defp fetch_body_credentials(%{"client_id" => client_id} = params)
-       when is_binary(client_id) and client_id != "" do
-    case params["client_secret"] do
-      secret when is_binary(secret) and secret != "" ->
-        {:ok, :client_secret_post, client_id, secret}
-
-      _ ->
-        {:ok, :none, client_id}
-    end
-  end
-
-  defp fetch_body_credentials(_params) do
-    {:error, error(@error_invalid_client, "client authentication required")}
-  end
-
-  # RFC 7617 §2 / RFC 6749 §2.3.1: the userid and password are
-  # `application/x-www-form-urlencoded`-encoded, colon-separated, base64.
-  defp decode_basic_credentials(encoded) do
-    with {:ok, decoded} <- Base.decode64(encoded),
-         [client_id, secret] <- String.split(decoded, ":", parts: 2) do
-      {:ok, :client_secret_basic, URI.decode_www_form(client_id), URI.decode_www_form(secret)}
-    else
-      _ -> {:error, error(@error_invalid_client, "malformed Basic authorization header")}
-    end
-  end
-
-  defp fetch_private_key_jwt_credentials(assertion_type, assertion) do
-    if assertion_type == ClientAssertion.assertion_type() do
-      {:ok, :private_key_jwt, assertion}
-    else
-      {:error, error(@error_invalid_client, @client_auth_failed)}
-    end
-  end
-
-  defp require_client_auth_method(config, method) do
-    case Map.get(config, :token_endpoint_auth_methods_supported) do
-      methods when is_list(methods) and methods != [] ->
-        if method in methods,
-          do: :ok,
-          else: {:error, error(@error_invalid_client, @client_auth_failed)}
-
-      _ ->
-        :ok
-    end
-  end
-
-  defp has_body_secret?(%{"client_secret" => secret}) when is_binary(secret) and secret != "",
-    do: true
-
-  defp has_body_secret?(_params), do: false
-
-  # The `:load_client` callback's contract (see `AttestoPhoenix.Config`)
-  # carries both existence and the revocation gate: `{:ok, client}`,
-  # `{:error, :not_found}`, or `{:error, :revoked}`. Revocation is therefore
-  # checked here without a separate predicate (RFC 7009 semantics for an
-  # already-revoked client).
-  defp verify_confidential_client(config, client_id, secret) do
-    case invoke(config.load_client, [client_id]) do
-      {:ok, client} ->
-        if invoke(config.verify_client_secret, [client, secret]) == true do
-          {:ok, client}
-        else
-          {:error, error(@error_invalid_client, @client_auth_failed)}
-        end
-
-      _other ->
-        # RFC 6749 §2.3 / OWASP: do not leak whether the client exists or is
-        # revoked. Run a dummy verification so the lookup-failure path matches
-        # the wrong-secret path in observable timing, and return one message.
-        _ = invoke(config.verify_client_secret, [:unknown_client, secret])
-        {:error, error(@error_invalid_client, @client_auth_failed)}
-    end
-  end
-
-  defp verify_private_key_jwt_client(config, assertion) do
-    with {:ok, client_id} <- ClientAssertion.peek_client_id(assertion),
-         {:ok, client} <- load_existing_client(config, client_id),
-         {:ok, jwks} <- client_jwks(config, client),
-         {:ok, claims} <-
-           ClientAssertion.verify(assertion, client_id, client_assertion_audiences(config), jwks,
-             max_lifetime: @client_assertion_max_lifetime
-           ),
-         :ok <- consume_client_assertion_jti(config, client_id, claims) do
-      {:ok, client}
-    else
-      _other -> {:error, error(@error_invalid_client, @client_auth_failed)}
-    end
-  end
-
-  defp client_jwks(config, client) do
-    case config_callback(config, :client_jwks) do
-      nil ->
-        {:error, :missing_client_jwks}
-
-      callback ->
-        case invoke(callback, [client]) do
-          {:ok, jwks} -> {:ok, jwks}
-          jwks when is_map(jwks) or is_list(jwks) -> {:ok, jwks}
-          _other -> {:error, :missing_client_jwks}
-        end
-    end
-  end
-
-  # FAPI 2 requires the client-assertion `aud` to be the issuer identifier;
-  # the token endpoint URL is not accepted.
-  defp client_assertion_audiences(config) do
-    [config.issuer]
-  end
-
-  defp consume_client_assertion_jti(config, client_id, %{"jti" => jti})
-       when is_binary(jti) and jti != "" do
-    key = client_assertion_replay_key(client_id, jti)
-
-    case invoke(replay_check(config), [key, @client_assertion_max_lifetime]) do
-      :ok -> :ok
-      _other -> {:error, :assertion_replay}
-    end
-  end
-
-  defp consume_client_assertion_jti(_config, _client_id, _claims), do: {:error, :missing_jti}
-
-  defp client_assertion_replay_key(client_id, jti) do
-    digest = :crypto.hash(:sha256, "#{client_id}\0#{jti}")
-    "client_assertion:" <> Base.url_encode64(digest, padding: false)
-  end
-
-  defp replay_check(%Config{replay_check: nil}), do: &ReplayCache.check_and_record/2
-  defp replay_check(%Config{replay_check: callback}), do: callback
 
   defp require_registered_grant_type(config, client, grant_type) do
     case client_grant_types(config, client) do
@@ -465,33 +279,6 @@ defmodule AttestoPhoenix.Controller.TokenController do
 
   defp client_grant_types(config, client) do
     Callback.invoke(config_callback(config, :client_grant_types), [client], nil)
-  end
-
-  # RFC 6749 §2.1: a client identified without a secret may proceed only if
-  # it is a public client. A successful `:load_client` is sufficient
-  # identification, but a confidential client MUST authenticate with a
-  # secret (RFC 6749 §2.3.1): accepting it secretless would let anyone who
-  # knows its `client_id` impersonate it, with no PKCE backstop on
-  # client_credentials. The host's `:client_public?` callback is the
-  # public/confidential discriminator; it MUST return `true` for the
-  # secretless path to be allowed. A public client's security then rests on
-  # PKCE (RFC 7636), enforced by `Attesto.AuthorizationCode` when the code
-  # is redeemed. A revoked or unknown client - and a confidential client
-  # presenting no secret - fails closed with the single generic message.
-  defp load_public_client(config, client_id) do
-    with {:ok, client} <- load_existing_client(config, client_id),
-         true <- client_public?(config, client) do
-      {:ok, client}
-    else
-      _other -> {:error, error(@error_invalid_client, @client_auth_failed)}
-    end
-  end
-
-  defp load_existing_client(config, client_id) do
-    case invoke(config.load_client, [client_id]) do
-      {:ok, client} -> {:ok, client}
-      _other -> {:error, :not_found}
-    end
   end
 
   # The public/confidential discriminator (RFC 6749 §2.1). Read defensively
@@ -1298,7 +1085,12 @@ defmodule AttestoPhoenix.Controller.TokenController do
     })
   end
 
-  defp emit_denied(config, conn, params, client, grant_type, %{error: code} = err) do
+  defp emit_denied(config, conn, params, client, grant_type, %OAuthError{} = err) do
+    # The RFC 6749 §5.2 error code is the atom `err.error`; the audit event
+    # carries it as its wire string so the payload is unchanged from before
+    # the core extraction.
+    code = Atom.to_string(err.error)
+
     Event.emit(config, :token_denied, %{
       client_id: denial_client_id(config, conn, params, client),
       scope: optional_param(params, "scope"),
@@ -1308,8 +1100,8 @@ defmodule AttestoPhoenix.Controller.TokenController do
         %{
           client_ip: RequestContext.client_ip(conn, config),
           error: code,
-          error_description: Map.get(err, :description),
-          http_status: Map.get(err, :status, 400),
+          error_description: err.error_description,
+          http_status: err.status,
           sender_constraint: sender_constraint_context(config, conn)
         }
         |> Enum.reject(fn {_key, value} -> is_nil(value) end)
@@ -1352,27 +1144,31 @@ defmodule AttestoPhoenix.Controller.TokenController do
     render_error(conn, err)
   end
 
-  defp render_error(conn, %{error: code} = err) do
+  defp render_error(conn, %OAuthError{} = err) do
     conn
-    |> merge_resp_headers(Map.get(err, :headers, []))
-    |> put_status(Map.get(err, :status, 400))
-    |> json(error_body(code, Map.get(err, :description)))
+    |> merge_resp_headers(err.headers)
+    |> put_status(err.status)
+    |> json(error_body(err.error, err.error_description))
   end
 
   # RFC 6749 §5.2 error response body.
   defp error_body(code, nil), do: %{error: code}
   defp error_body(code, description), do: %{error: code, error_description: description}
 
-  defp error(code, description), do: %{error: code, description: description, status: 400}
+  # The single error value the controller threads through its `with` chains is
+  # `%AttestoPhoenix.OAuthError{}` (the shape the `ClientAuthentication` core
+  # also returns). The string `@error_*` codes are the RFC 6749 §5.2 wire
+  # values; they convert to the matching pre-existing atom code here.
+  defp error(code, description), do: OAuthError.new(error_code(code), description, status: 400)
 
   defp error(code, description, opts) do
-    %{
-      error: code,
-      description: description,
+    OAuthError.new(error_code(code), description,
       status: Keyword.get(opts, :status, 400),
       headers: Keyword.get(opts, :headers, [])
-    }
+    )
   end
+
+  defp error_code(code) when is_binary(code), do: String.to_existing_atom(code)
 
   # RFC 6749 §5.2: redemption/rotation failures all map to invalid_grant; the
   # specific internal reason is not exposed to the client. Reuse detection is
