@@ -178,12 +178,10 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
     end
   end
 
-  # OpenID Connect Discovery §3 `request_parameter_supported` /
-  # `request_uri_parameter_supported`: the authorization endpoint consumes
-  # signed request objects (`request`, JAR/RFC 9101) when the host supplies a
-  # `:client_jwks` callback. It resolves PAR `request_uri` URNs issued by this
-  # server, but still does not advertise arbitrary OIDC request_uri fetching.
-  @request_parameter_supported true
+  # OpenID Connect Discovery §3 `request_uri_parameter_supported`: this server
+  # resolves PAR `request_uri` URNs it issued, but does not advertise arbitrary
+  # OIDC `request_uri` fetching. `request_parameter_supported` is derived per
+  # install from request-object capability (see request_objects_supported?/1).
   @request_uri_parameter_supported false
 
   # Translate the configured host capabilities into the OpenID Connect
@@ -215,14 +213,19 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
       claims_supported: presence(config.claims_supported),
       registration_endpoint: registration_endpoint(config),
       # OpenID Connect Discovery §3 capability flags reflecting what is wired.
-      request_parameter_supported: @request_parameter_supported,
+      # `request_parameter_supported` tracks actual capability: the authorization
+      # endpoint can verify a signed request object only when the host can
+      # resolve a client's trusted JWKS, so an install without that capability
+      # advertises `false` rather than a JAR support it cannot honour.
+      request_parameter_supported: request_objects_supported?(config),
       request_uri_parameter_supported: @request_uri_parameter_supported,
       claims_parameter_supported: config.claims_parameter_supported,
       # RFC 9101 §10.5 / FAPI 2.0 Message Signing §5.3.1: the request-object
       # signing algorithms accepted, and (only when the policy mandates it) that
-      # signed request objects are required. Both derive from the configured
-      # request_object_policy, so discovery never drifts from enforcement.
-      request_object_signing_alg_values_supported: request_object_signing_algs(config),
+      # signed request objects are required. The algorithm list is advertised
+      # only when request objects are actually supported, so discovery never
+      # drifts from enforcement.
+      request_object_signing_alg_values_supported: request_object_signing_alg_values(config),
       require_signed_request_object: require_signed_request_object(config),
       # Host catalogs: advertised only when the host configures a non-empty list
       # (the core builder drops the nil the helper returns for `[]`).
@@ -259,6 +262,21 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
       _ -> SigningAlg.fapi_algs()
     end
   end
+
+  # Advertise the request-object signing algorithms only when request objects
+  # are actually supported; otherwise return nil so the core builder drops the
+  # member (no algorithm list for a capability the install does not have).
+  defp request_object_signing_alg_values(%Config{} = config) do
+    if request_objects_supported?(config), do: request_object_signing_algs(config)
+  end
+
+  # OpenID Connect Discovery §3: the authorization endpoint can verify a signed
+  # request object (JAR / RFC 9101) only when the host can resolve a client's
+  # trusted JWKS - a flat `:client_jwks` callback or an installed `:client_store`
+  # behaviour (`Config.client_jwks_fun/1` resolves either). Absent that, no
+  # client can use request objects, so the OP does not advertise the capability.
+  defp request_objects_supported?(%Config{} = config),
+    do: not is_nil(Config.client_jwks_fun(config))
 
   # RFC 9101 §10.5 `require_signed_request_object`: advertise `true` only when
   # the policy mandates a signed request object (FAPI 2.0 Message Signing

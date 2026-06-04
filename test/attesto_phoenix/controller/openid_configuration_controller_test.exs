@@ -179,10 +179,21 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationControllerTest do
       assert body["require_pushed_authorization_requests"] == true
     end
 
-    test "advertises request_parameter_supported=true (JAR / OIDC Core §6.1)" do
-      body = call_show(host_config(), protocol_config()) |> decode_body()
+    test "advertises request_parameter_supported=true when the host can resolve client JWKS" do
+      # JAR support exists only when a client's trusted JWKS is resolvable
+      # (a :client_jwks callback here), so discovery tracks actual capability.
+      host = host_config(client_jwks: fn _client -> %{"keys" => []} end)
+      body = call_show(host, protocol_config()) |> decode_body()
 
       assert body["request_parameter_supported"] == true
+    end
+
+    test "advertises request_parameter_supported=false without request-object capability" do
+      # No :client_jwks (and no :client_store) means no client can use a signed
+      # request object, so the OP must not advertise JAR support it cannot honour.
+      body = call_show(host_config(), protocol_config()) |> decode_body()
+
+      assert body["request_parameter_supported"] == false
     end
 
     test "advertises request_uri_parameter_supported=false (OIDC Discovery §3 / Core §6.2)" do
@@ -191,12 +202,20 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationControllerTest do
       assert body["request_uri_parameter_supported"] == false
     end
 
-    test "advertises request_object_signing_alg_values_supported (RFC 9101 §10.5)" do
+    test "advertises request_object_signing_alg_values_supported when JAR is supported (RFC 9101 §10.5)" do
       # Default policy leaves accepted_algs unset, so the verifier default
-      # (PS256, ES256, EdDSA) is advertised.
-      body = call_show(host_config(), protocol_config()) |> decode_body()
+      # (PS256, ES256, EdDSA) is advertised - but only when request objects are
+      # actually supported.
+      host = host_config(client_jwks: fn _client -> %{"keys" => []} end)
+      body = call_show(host, protocol_config()) |> decode_body()
 
       assert body["request_object_signing_alg_values_supported"] == ["PS256", "ES256", "EdDSA"]
+    end
+
+    test "omits request_object_signing_alg_values_supported without request-object capability" do
+      body = call_show(host_config(), protocol_config()) |> decode_body()
+
+      refute Map.has_key?(body, "request_object_signing_alg_values_supported")
     end
 
     test "omits require_signed_request_object under the default policy (RFC 9101 §10.5)" do

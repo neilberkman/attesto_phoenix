@@ -589,8 +589,11 @@ defmodule AttestoPhoenix.Config do
   # not pass principal_kinds explicitly (e.g. the authorization endpoint signing
   # JARM responses). An explicit `extra` still wins. Omitted when unresolved so
   # Attesto.Config.new/1 surfaces the missing required value.
-  defp resolved_principal_kinds(%__MODULE__{} = config) do
-    case Callback.config_callback(config, :principal_kinds) do
+  defp resolved_principal_kinds(%__MODULE__{principal_kinds: principal_kinds}) do
+    # Read the field directly: it is declared `[PrincipalKind.t()] | callback() |
+    # nil`, so the list branch is reachable. (`config_callback/2` narrows its
+    # return to `callback() | nil`, under which the `is_list` guard cannot hold.)
+    case principal_kinds do
       kinds when is_list(kinds) and kinds != [] ->
         [principal_kinds: kinds]
 

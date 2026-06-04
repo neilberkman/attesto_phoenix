@@ -48,6 +48,12 @@ and PAR/JAR hardening. Requires `attesto ~> 0.6.13`.
 - `AttestoPhoenix.ClientAuthentication.Result.client_id` falls back to the
   presented credential identifier so the signed-introspection audience (and the
   PAR/token client identity) resolves without a separate `:client_id` callback.
+- OpenID Provider Metadata derives `request_parameter_supported` (and only then
+  advertises `request_object_signing_alg_values_supported`) from actual
+  request-object capability — whether the host can resolve a client's trusted
+  JWKS (a `:client_jwks` callback or an installed `:client_store`). An install
+  without that capability now advertises `request_parameter_supported: false`
+  instead of a JAR support it cannot honour.
 
 ## [0.7.2] - 2026-06-03
 

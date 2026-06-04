@@ -17,10 +17,6 @@ defmodule AttestoPhoenix.AuthorizationServer.RequestPolicy do
   alias Attesto.AuthorizationRequest
   alias AttestoPhoenix.{Callback, Config}
 
-  # OIDC Core §3.1.2.1: the reserved scope value that marks an OpenID Connect
-  # Authentication Request, the only kind the nonce requirement applies to.
-  @openid_scope "openid"
-
   @doc """
   Validate `params` as an authorization request for `client`, resolving the
   redirect-URI/PKCE/nonce policy from `config` and delegating to
@@ -41,7 +37,7 @@ defmodule AttestoPhoenix.AuthorizationServer.RequestPolicy do
       [
         registered_redirect_uris: registered_redirect_uris(config, client),
         require_pkce: require_pkce?(config, client),
-        require_nonce: require_nonce?(config, params)
+        require_nonce: require_nonce?(config)
       ] ++ extra_opts
 
     AuthorizationRequest.validate(params, opts)
@@ -90,21 +86,16 @@ defmodule AttestoPhoenix.AuthorizationServer.RequestPolicy do
   end
 
   @doc """
-  Whether `nonce` is required for this request (OIDC Core §3.1.2.1).
+  The host's OP nonce policy flag (OIDC Core §3.1.2.1).
 
-  Only an OpenID Connect Authentication Request (one whose `scope` carries the
-  reserved `openid` value) is subject to the host's `:require_nonce` policy; a
-  plain OAuth request keeps `code` at SHOULD and is never nonce-constrained.
+  Returns the raw `:require_nonce` configuration. The OIDC openid-scope gate is
+  NOT applied here: it must run on the EFFECTIVE request (after any signed
+  `request` object is merged), which only `Attesto.AuthorizationRequest.validate/2`
+  sees. Applying the gate on the raw outer params here would let a direct JAR
+  carrying `scope=openid` only inside the signed object bypass the requirement.
   """
-  @spec require_nonce?(Config.t(), map()) :: boolean()
-  def require_nonce?(config, params) do
-    Callback.config_flag(config, :require_nonce) and openid_request?(params)
-  end
-
-  defp openid_request?(params) do
-    case Map.get(params, "scope") do
-      value when is_binary(value) -> @openid_scope in String.split(value, " ", trim: true)
-      _ -> false
-    end
+  @spec require_nonce?(Config.t()) :: boolean()
+  def require_nonce?(config) do
+    Callback.config_flag(config, :require_nonce)
   end
 end

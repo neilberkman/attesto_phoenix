@@ -206,7 +206,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
     with {:ok, request} <-
            AuthorizationRequest.validate(params,
              registered_redirect_uris: RequestPolicy.registered_redirect_uris(config, client),
-             require_nonce: RequestPolicy.require_nonce?(config, params),
+             require_nonce: RequestPolicy.require_nonce?(config),
              require_pkce: RequestPolicy.require_pkce?(config, client),
              request_object_jwks: client_jwks(config, client),
              request_object_audience: config.issuer,
