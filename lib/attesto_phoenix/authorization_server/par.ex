@@ -103,7 +103,8 @@ defmodule AttestoPhoenix.AuthorizationServer.PAR do
     # Verify the request object FIRST so its signed parameters are authoritative
     # (RFC 9101 §6.3) before DPoP reconciliation: a signed `dpop_jkt` must be the
     # value the presented proof is checked against, never an unsigned body value.
-    with {:ok, params} <- verify_request_object(config, client, params),
+    with :ok <- reject_request_uri(params),
+         {:ok, params} <- verify_request_object(config, client, params),
          :ok <- validate_pushed_request(config, client, params),
          {:ok, dpop_jkt} <- verify_dpop_binding(config, dpop_input, params) do
       stored =
@@ -121,6 +122,18 @@ defmodule AttestoPhoenix.AuthorizationServer.PAR do
       end
     end
   end
+
+  # RFC 9126 §2.1 (step 2): the PAR endpoint MUST reject a request that itself
+  # carries a `request_uri` parameter - a client cannot push a reference to
+  # another reference. Checked on the RAW pushed parameters, before request-
+  # object verification, so a `request` object replacing the parameter set
+  # cannot mask a `request_uri` smuggled in as a sibling form parameter.
+  defp reject_request_uri(%{"request_uri" => value}) when is_binary(value) and value != "" do
+    {:error,
+     error(@error_invalid_request, "request_uri must not be used at the PAR endpoint")}
+  end
+
+  defp reject_request_uri(_params), do: :ok
 
   # RFC 9126 §2.1 step 3: validate the pushed request as the authorization
   # endpoint would - the request `redirect_uri` must exactly match one of the

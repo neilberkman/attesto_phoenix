@@ -319,7 +319,10 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
     assert conn.status == 201
   end
 
-  test "accepts private_key_jwt assertion audience set to the PAR endpoint URL" do
+  test "rejects a private_key_jwt assertion audienced to the PAR endpoint URL (FAPI: issuer only)" do
+    # FAPI 2.0 §5.3.2.1 requires the client-assertion `aud` to be the issuer
+    # identifier; the concrete endpoint URL must NOT be accepted (conformance
+    # FAPI2SPFinalPAREndpointAsAudienceFails).
     client_key = JOSE.JWK.generate_key({:ec, "P-256"})
     client_jwks = %{"keys" => [public_jwk(client_key)]}
 
@@ -339,7 +342,8 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
       |> conn(@endpoint_path, params)
       |> PARController.create(params)
 
-    assert conn.status == 201
+    assert conn.status == 400
+    assert JSON.decode!(conn.resp_body)["error"] == "invalid_client"
   end
 
   test "rejects private_key_jwt assertion audience that is neither the issuer nor the endpoint" do

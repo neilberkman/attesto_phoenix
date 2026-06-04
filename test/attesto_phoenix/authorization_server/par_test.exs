@@ -202,6 +202,17 @@ defmodule AttestoPhoenix.AuthorizationServer.PARTest do
       assert {:error, %OAuthError{error: :invalid_request, status: 400}} =
                PAR.store(config, request(params: base_params()))
     end
+
+    test "rejects a request_uri parameter at the PAR endpoint (RFC 9126 §2.1)" do
+      # RFC 9126 §2.1 step 2 / FAPI2SPFinalPARRejectRequestUriInParAuthorizationFormParams:
+      # a client may not push a reference to another reference. Checked on the
+      # raw params, so it is not masked by a request object replacing the set.
+      config = config()
+      params = Map.put(base_params(), "request_uri", "urn:ietf:params:oauth:request_uri:nested")
+
+      assert {:error, %OAuthError{error: :invalid_request, status: 400}} =
+               PAR.store(config, request(params: params))
+    end
   end
 
   describe "DPoP binding (RFC 9449 §4.2 / §4.3)" do

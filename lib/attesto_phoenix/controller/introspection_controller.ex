@@ -184,13 +184,14 @@ defmodule AttestoPhoenix.Controller.IntrospectionController do
   end
 
   # RFC 6749 §2.3 / RFC 7662 §2.1: authenticate the caller through the shared
-  # ClientAuthentication core, the same policy as the token endpoint. A client
-  # assertion may be audienced to the issuer or the introspection endpoint URL
-  # (RFC 7523 §3), both derived from trusted Config (never the request Host).
+  # ClientAuthentication core, the same policy as the token endpoint. The client
+  # assertion MUST be audienced to the issuer identifier (FAPI 2.0 §5.3.2.1),
+  # derived from trusted Config (never the request Host) - the concrete endpoint
+  # URL is not accepted as `aud`.
   defp authenticate_client(config, conn, params) do
     policy = %Policy{
       allow_public: false,
-      assertion_audiences: [config.issuer, Config.introspection_endpoint_url(config)],
+      assertion_audiences: [config.issuer],
       assertion_max_lifetime: @client_assertion_max_lifetime,
       assertion_signing_algs: config.client_auth_signing_algs
     }

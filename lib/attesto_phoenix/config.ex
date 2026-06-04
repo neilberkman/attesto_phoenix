@@ -217,7 +217,9 @@ defmodule AttestoPhoenix.Config do
       authorization requests to use a PAR `request_uri` issued by this server
       (RFC 9126). Default `false`.
     * `:authorization_response_iss` - include the RFC 9207 `iss` authorization
-      response parameter on success and error redirects. Default `false`.
+      response parameter on success and error redirects. Default `true`
+      (authorization-server mix-up defense, mandated by FAPI 2.0); set `false`
+      only for a deployment that must omit it.
     * `:require_https` - enforce HTTPS on the endpoints. Default `true`.
     * `:trusted_proxies` - list of trusted proxy CIDRs/IPs controlling whether
       `X-Forwarded-*` headers are honored. Default `[]` (no forwarded trust).
@@ -401,7 +403,7 @@ defmodule AttestoPhoenix.Config do
     require_nonce: false,
     require_pkce: true,
     require_pushed_authorization_requests: false,
-    authorization_response_iss: false,
+    authorization_response_iss: true,
     require_https: true,
     trusted_proxies: [],
     access_token_ttl: 900,

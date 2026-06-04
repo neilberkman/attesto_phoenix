@@ -361,7 +361,29 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
       assert TestStore.peek(code).data.dpop_jkt == jkt
     end
 
-    test "uses the client_id from the pushed request, not the front-channel query" do
+    test "uses the bound client and ignores other front-channel params when the client_id matches" do
+      request_uri = "urn:ietf:params:oauth:request_uri:bound-client"
+
+      put_config(
+        require_pushed_authorization_requests: true,
+        par_store: PARStore
+      )
+
+      :ok = PARStore.put(request_uri, valid_params(), 60)
+
+      conn = call(%{"client_id" => @client_id, "request_uri" => request_uri})
+
+      assert conn.status == 302
+      code = location_query(conn)["code"]
+      assert is_binary(code)
+      assert TestStore.peek(code).data.client_id == @client_id
+    end
+
+    test "rejects a front-channel client_id that does not match the request_uri's bound client" do
+      # RFC 9126 §2.2 / FAPI2SPFinalPAREnsureRequestUriIsBoundToClient: the
+      # request_uri is bound to the client that pushed it; a different client
+      # replaying the reference (mismatched front-channel client_id) is rejected,
+      # non-redirectable (the bound redirect_uri is not trusted for this caller).
       request_uri = "urn:ietf:params:oauth:request_uri:bound-client"
 
       put_config(
@@ -373,10 +395,9 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
 
       conn = call(%{"client_id" => "front-channel-client", "request_uri" => request_uri})
 
-      assert conn.status == 302
-      code = location_query(conn)["code"]
-      assert is_binary(code)
-      assert TestStore.peek(code).data.client_id == @client_id
+      # Non-redirectable direct error: a 400 means no authorization code was issued.
+      assert conn.status == 400
+      assert JSON.decode!(conn.resp_body)["error"] == "invalid_request"
     end
 
     test "does not consume a PAR request_uri before host re-entry completes" do
@@ -402,6 +423,23 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
       assert is_binary(second_query["code"])
       refute first_query["error"]
       refute second_query["error"]
+    end
+
+    test "an unknown/expired PAR request_uri is a direct invalid_request_uri" do
+      # RFC 9126 §2.2 / FAPI2SPFinalPARAttemptToUseExpiredRequestUri: a PAR
+      # `urn:ietf:params:oauth:request_uri:` reference that is not in the store
+      # (expired or never issued) must be rejected as invalid_request_uri, never
+      # treated as an absent reference (which would surface the wrong error).
+      put_config(require_pushed_authorization_requests: true, par_store: PARStore)
+
+      conn =
+        call(%{
+          "client_id" => @client_id,
+          "request_uri" => "urn:ietf:params:oauth:request_uri:does-not-exist"
+        })
+
+      assert conn.status == 400
+      assert JSON.decode!(conn.resp_body)["error"] == "invalid_request_uri"
     end
   end
 

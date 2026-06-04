@@ -140,7 +140,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
     config = resolve_config()
 
     with :ok <- RequestContext.check_https(conn, config),
-         {params, par_resolved?} <- resolve_request_uri(config, params),
+         {:ok, params, par_resolved?} <- resolve_request_uri(config, params),
          {:ok, client} <- load_client(config, params),
          {:ok, request} <- validate_request(config, client, params, par_resolved?) do
       run_flow(conn, config, client, request, dpop_jkt_from_params(params))
@@ -221,20 +221,58 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
        when is_binary(request_uri) and request_uri != "" do
     case par_store(config) do
       nil ->
-        {params, false}
+        {:ok, params, false}
 
       store ->
         case fetch_par_request(store, request_uri) do
-          # PAR/request-object request parameters are authoritative. Front-channel
-          # parameters outside the pushed request, such as `state`, must not be
-          # used to augment the authorization request.
-          {:ok, stored} -> {stored, true}
-          :error -> {params, false}
+          {:ok, stored} -> resolve_stored_request(params, stored)
+          :error -> resolve_missing_request_uri(request_uri, params)
         end
     end
   end
 
-  defp resolve_request_uri(_config, params), do: {params, false}
+  defp resolve_request_uri(_config, params), do: {:ok, params, false}
+
+  # A `request_uri` the store does not hold.
+  #
+  # RFC 9126 §2.2: an unknown or EXPIRED PAR `request_uri` (the
+  # `urn:ietf:params:oauth:request_uri:` reference this AS issues) is
+  # `invalid_request_uri` - it MUST NOT fall through to treating the opaque URN
+  # as a by-value parameter (which would surface the wrong error);
+  # non-redirectable, since the reference carried no trusted redirect_uri for
+  # this caller. An external (non-PAR) reference is left for validation to
+  # reject as `request_uri_not_supported` (OpenID Connect Core §6.2), as this AS
+  # does not fetch external request objects.
+  defp resolve_missing_request_uri(request_uri, params) do
+    if par_request_uri?(request_uri) do
+      {:error, {:direct, :invalid_request_uri}}
+    else
+      {:ok, params, false}
+    end
+  end
+
+  # The `request_uri` reference scheme this AS issues from its PAR endpoint
+  # (RFC 9126 §2.2); a store miss on one of these is an expired/unknown PAR
+  # reference, distinct from an unsupported external request_uri.
+  defp par_request_uri?(request_uri),
+    do: String.starts_with?(request_uri, "urn:ietf:params:oauth:request_uri:")
+
+  # RFC 9126 §2.2: the `request_uri` is bound to the client that pushed it. The
+  # stored, verified PAR parameters are authoritative (front-channel parameters
+  # outside the pushed request, such as `state`, must not augment the request),
+  # but a front-channel `client_id` that disagrees with the bound one is a
+  # different client replaying the reference and is rejected (non-redirectable:
+  # the bound redirect_uri cannot be trusted for the mismatched caller). An
+  # absent front-channel `client_id` defers to the bound one.
+  defp resolve_stored_request(params, stored) do
+    presented = params["client_id"]
+
+    if is_binary(presented) and presented != "" and presented != stored["client_id"] do
+      {:error, {:direct, :request_uri_client_mismatch}}
+    else
+      {:ok, stored, true}
+    end
+  end
 
   defp fetch_par_request(store, request_uri) do
     cond do
@@ -711,7 +749,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
     else
       body =
         JSON.encode!(%{
-          error: "invalid_request",
+          error: direct_error_code(reason),
           error_description: description
         })
 
@@ -807,7 +845,21 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
   defp direct_error_description(:redirect_uri_not_registered),
     do: "redirect_uri is not registered for this client"
 
+  defp direct_error_description(:invalid_request_uri),
+    do: "the request_uri is unknown or has expired"
+
+  defp direct_error_description(:request_uri_client_mismatch),
+    do: "the request_uri was not issued to this client"
+
   defp direct_error_description(_), do: "invalid authorization request"
+
+  # The OAuth error code rendered for a non-redirectable failure. RFC 9126 §2.2:
+  # an unknown/expired `request_uri` is `invalid_request_uri`; a `request_uri`
+  # replayed by a different client is reported as `invalid_request`. Everything
+  # else (bad/absent client_id or redirect_uri) is the `invalid_request`
+  # catch-all (OIDC Core §3.1.2.6).
+  defp direct_error_code(:invalid_request_uri), do: "invalid_request_uri"
+  defp direct_error_code(_reason), do: "invalid_request"
 
   # ── Audit / telemetry ────────────────────────────────────────────────────
 

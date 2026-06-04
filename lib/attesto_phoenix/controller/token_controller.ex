@@ -185,15 +185,16 @@ defmodule AttestoPhoenix.Controller.TokenController do
   # RFC 6749 §2.3: client authentication is delegated to the conn-free core
   # `AttestoPhoenix.ClientAuthentication`, shared with the PAR endpoint. The
   # token endpoint's policy: a body `client_id` without a secret is the
-  # public-client path (RFC 6749 §2.1), so `allow_public: true`; a client
-  # assertion may be audienced to either the issuer identifier or the concrete
-  # endpoint URL it is presented at (RFC 7523 §3 / OIDC Core §9), both derived
-  # from trusted `Config` (never the request `Host`), and lives at most
-  # `@client_assertion_max_lifetime` seconds (RFC 7523 §3).
+  # public-client path (RFC 6749 §2.1), so `allow_public: true`; the client
+  # assertion MUST be audienced to the issuer identifier (FAPI 2.0 Security
+  # Profile §5.3.2.1), derived from trusted `Config` (never the request `Host`) -
+  # the concrete endpoint URL is NOT accepted as `aud`, so a confused-deputy
+  # assertion minted for a different endpoint is rejected. The assertion lives at
+  # most `@client_assertion_max_lifetime` seconds (RFC 7523 §3).
   defp authenticate_client(config, conn, params) do
     policy = %Policy{
       allow_public: true,
-      assertion_audiences: [config.issuer, Config.token_endpoint_url(config)],
+      assertion_audiences: [config.issuer],
       assertion_max_lifetime: @client_assertion_max_lifetime,
       assertion_signing_algs: config.client_auth_signing_algs
     }

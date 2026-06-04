@@ -6,8 +6,35 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security / FAPI 2.0 conformance
+
+Closes four conformance gaps found by auditing the OpenID FAPI 2.0 test suite
+source against the implementation:
+
+- **PAR `request_uri` is bound to the client.** The authorization endpoint now
+  rejects a front-channel `client_id` that does not match the client the
+  `request_uri` was issued to (RFC 9126 §2.2 / `PAREnsureRequestUriIsBoundToClient`)
+  instead of silently using the stored client.
+- **Unknown/expired PAR `request_uri` → `invalid_request_uri`.** A
+  `urn:ietf:params:oauth:request_uri:` reference not in the store now returns the
+  correct `invalid_request_uri` error rather than falling through to
+  `request_uri_not_supported`/`invalid_request` (RFC 9126 §2.2 /
+  `PARAttemptToUseExpiredRequestUri`). External (non-PAR) references still report
+  `request_uri_not_supported`.
+- **PAR rejects a `request_uri` parameter.** The PAR endpoint rejects a request
+  carrying `request_uri` (RFC 9126 §2.1 step 2), checked on the raw parameters so
+  it cannot be masked by a `request` object replacing the set.
+- **Client-assertion audience is issuer-only.** `private_key_jwt` assertions at
+  the token, PAR, and introspection endpoints must be audienced to the issuer
+  identifier (FAPI 2.0 §5.3.2.1); the concrete endpoint URL is no longer accepted
+  as `aud`, closing a confused-deputy gap (`PAREndpointAsAudienceFails`).
+
 ### Changed
 
+- `:authorization_response_iss` now defaults to **`true`** (RFC 9207
+  authorization-server mix-up defense, mandated by FAPI 2.0). Set `false` to opt
+  out. Discovery advertises `authorization_response_iss_parameter_supported`
+  accordingly.
 - Internal: `mix dialyzer` is clean again. `token.ex` resolves `:principal_kinds`
   by reading the struct field directly (its type admits a list, unlike the
   `callback() | nil` reader), and two fail-closed grant-pipeline clauses are
