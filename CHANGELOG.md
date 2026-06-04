@@ -6,6 +6,20 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+### Security
+
+- **PAR `request_uri` is now single-use (RFC 9126 §2.2 / FAPI 2.0).** The
+  reference is consumed once an authorization code is issued (not on the
+  non-consuming `fetch` that lets the host establish login/consent and
+  re-enter), so a completed flow cannot be replayed within the remaining TTL.
+  An already-consumed reference is rejected as `invalid_request_uri`. (Flips the
+  conformance `PARAttemptReuseRequestUri` warning to a clean pass.)
+- **UserInfo derives the DPoP `htu` via `RequestContext.canonical_url`**, like
+  every other endpoint — honouring a configured `:htu` but otherwise gating
+  `X-Forwarded-*`/Host on the trusted-proxy allowlist. Previously it fell back
+  to the raw request Host when `:htu` was unset (its default), the one endpoint
+  that bypassed the host-header trust boundary.
+
 ## [0.7.4] - 2026-06-04
 
 Requires `attesto ~> 0.6.13`.

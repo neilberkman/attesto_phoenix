@@ -400,8 +400,36 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
       assert JSON.decode!(conn.resp_body)["error"] == "invalid_request"
     end
 
-    test "does not consume a PAR request_uri before host re-entry completes" do
+    test "a PAR request_uri survives re-entry until a code is issued" do
+      # FAPI2 / RFC 9126 PAREnsureServerAcceptsReusedRequestUriBeforeAuthenticationCompletion:
+      # a login that halts (host redirects to its own login page) issues no code,
+      # so the request_uri MUST remain usable for the host's re-entry.
       request_uri = "urn:ietf:params:oauth:request_uri:reentry"
+
+      put_config(
+        require_pushed_authorization_requests: true,
+        par_store: PARStore,
+        authenticate_resource_owner: fn conn, _request, _opts ->
+          {:halt, Plug.Conn.send_resp(conn, 200, "login")}
+        end
+      )
+
+      :ok = PARStore.put(request_uri, valid_params(), 60)
+
+      first = call(%{"client_id" => @client_id, "request_uri" => request_uri})
+      second = call(%{"client_id" => @client_id, "request_uri" => request_uri})
+
+      # Both halt at the host login (no code, no error); the reference is untouched.
+      assert first.status == 200
+      assert second.status == 200
+      assert {:ok, _} = PARStore.fetch(request_uri)
+    end
+
+    test "a completed PAR flow consumes the request_uri (single-use, RFC 9126 §2.2)" do
+      # FAPI2 / RFC 9126 PARAttemptReuseRequestUri: once a code is issued the
+      # request_uri is consumed, so replaying it within the TTL is rejected as
+      # invalid_request_uri rather than minting a second code.
+      request_uri = "urn:ietf:params:oauth:request_uri:single-use"
 
       put_config(
         require_pushed_authorization_requests: true,
@@ -414,15 +442,11 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
       second = call(%{"client_id" => @client_id, "request_uri" => request_uri})
 
       assert first.status == 302
-      assert second.status == 302
+      assert is_binary(location_query(first)["code"])
 
-      first_query = first |> location_query()
-      second_query = second |> location_query()
-
-      assert is_binary(first_query["code"])
-      assert is_binary(second_query["code"])
-      refute first_query["error"]
-      refute second_query["error"]
+      assert second.status == 400
+      assert JSON.decode!(second.resp_body)["error"] == "invalid_request_uri"
+      assert :error = PARStore.fetch(request_uri)
     end
 
     test "an unknown/expired PAR request_uri is a direct invalid_request_uri" do

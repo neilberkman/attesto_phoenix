@@ -138,12 +138,17 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
   @spec authorize(Plug.Conn.t(), map()) :: Plug.Conn.t()
   def authorize(conn, params) do
     config = resolve_config()
+    # Capture the PAR reference before resolution rebinds `params` to the stored
+    # set, so it can be consumed once (and only once) a code is issued.
+    par_request_uri = params["request_uri"]
 
     with :ok <- RequestContext.check_https(conn, config),
          {:ok, params, par_resolved?} <- resolve_request_uri(config, params),
          {:ok, client} <- load_client(config, params),
          {:ok, request} <- validate_request(config, client, params, par_resolved?) do
-      run_flow(conn, config, client, request, dpop_jkt_from_params(params))
+      conn
+      |> stash_par_request_uri(par_request_uri, par_resolved?)
+      |> run_flow(config, client, request, dpop_jkt_from_params(params))
     else
       {:error, :insecure_transport} ->
         # RFC 6749 §3.1 / §10.1: the authorization endpoint requires TLS. The
@@ -594,6 +599,13 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
   # response parameters; under JARM `iss` rides inside the JWT (JARM §2.1), under
   # the query mode it is the RFC 9207 `iss` parameter (added in emit_response/6).
   defp emit_success(conn, config, request, code) do
+    # RFC 9126 §2.2 / FAPI 2.0: the PAR `request_uri` is one-time-use. It is
+    # resolved with a non-consuming `fetch` so the host can establish login and
+    # consent and re-enter `/authorize` with the same reference, but once a code
+    # is actually issued the reference is consumed, so a completed flow cannot be
+    # replayed within the remaining TTL.
+    consume_par_request_uri(conn, config)
+
     emit_response(
       conn,
       config,
@@ -602,6 +614,29 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
       request.client_id,
       drop_nil(%{"code" => code, "state" => request.state})
     )
+  end
+
+  # Stash the PAR reference (only when it actually resolved a stored request) so
+  # the success path can consume it; a non-PAR or unresolved request stashes
+  # nothing.
+  defp stash_par_request_uri(conn, uri, true) when is_binary(uri) and uri != "",
+    do: Plug.Conn.put_private(conn, :attesto_par_request_uri, uri)
+
+  defp stash_par_request_uri(conn, _uri, _par_resolved?), do: conn
+
+  # Consume the stashed PAR `request_uri` from the store (single-use). Best
+  # effort: a store without `take/1`, or an already-evicted entry, is a no-op -
+  # the code has already been issued.
+  defp consume_par_request_uri(conn, config) do
+    case conn.private[:attesto_par_request_uri] do
+      uri when is_binary(uri) and uri != "" ->
+        store = par_store(config)
+        if function_exported?(store, :take, 1), do: store.take(uri)
+        :ok
+
+      _ ->
+        :ok
+    end
   end
 
   # RFC 6749 §4.1.2.1: error reported once the client/redirect_uri is trusted,

@@ -77,6 +77,7 @@ defmodule AttestoPhoenix.Controller.UserinfoController do
   alias Attesto.Plug.Authenticate
   alias AttestoPhoenix.Callback
   alias AttestoPhoenix.Config
+  alias AttestoPhoenix.RequestContext
 
   # The conn assign `Attesto.Plug.Authenticate` writes the verified claims
   # under (its default `:claims_key`).
@@ -280,7 +281,13 @@ defmodule AttestoPhoenix.Controller.UserinfoController do
     |> put_optional(:nonce_check, nonce_check(config))
     |> put_optional(:nonce_issue, nonce_issue(config))
     |> put_optional(:cert_der, cert_der(config))
-    |> put_optional(:htu, config.htu)
+    # RFC 9449 §4.3: derive the DPoP `htu` the same way every other endpoint
+    # does — via RequestContext.canonical_url, which honours a configured
+    # `:htu` but otherwise gates `X-Forwarded-*`/Host on the trusted-proxy
+    # allowlist (fail closed). Passing the raw `config.htu` (default nil) would
+    # let the core plug fall back to the unguarded request Host on this endpoint
+    # alone, an inconsistency with the rest of the server.
+    |> Keyword.put(:htu, fn conn -> RequestContext.canonical_url(conn, config) end)
   end
 
   # The `Attesto.Config` consumed by `Attesto.Token`, derived from the same
