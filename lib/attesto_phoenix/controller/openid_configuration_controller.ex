@@ -193,6 +193,8 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
   # configures no other scopes.
   @spec discovery_opts(Config.t()) :: keyword()
   defp discovery_opts(%Config{} = config) do
+    jar_alg_values = RequestObjectMetadata.signing_alg_values(config)
+
     [
       response_types_supported: @response_types_supported,
       response_modes_supported: @response_modes_supported,
@@ -224,7 +226,7 @@ defmodule AttestoPhoenix.Controller.OpenIDConfigurationController do
       # signed request objects are required. The algorithm list is advertised
       # only when request objects are actually supported, so discovery never
       # drifts from enforcement.
-      request_object_signing_alg_values_supported: RequestObjectMetadata.signing_alg_values(config),
+      request_object_signing_alg_values_supported: jar_alg_values,
       require_signed_request_object: RequestObjectMetadata.require_signed(config),
       # Host catalogs: advertised only when the host configures a non-empty list
       # (the core builder drops the nil the helper returns for `[]`).

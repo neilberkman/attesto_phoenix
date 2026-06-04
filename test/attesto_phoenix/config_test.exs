@@ -377,9 +377,10 @@ defmodule AttestoPhoenix.ConfigTest do
     test "accepts a required-request-object policy when :client_jwks resolves via :client_store" do
       # The capability may come from an installed :client_store, not only a flat
       # :client_jwks callback.
-      built = config(request_object_policy: Policy.fapi_message_signing(), client_store: FullStore)
+      policy = Policy.fapi_message_signing()
+      built = config(request_object_policy: policy, client_store: FullStore)
 
-      assert built.request_object_policy == Policy.fapi_message_signing()
+      assert built.request_object_policy == policy
     end
   end
 end

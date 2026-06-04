@@ -162,6 +162,8 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
   # server actually implements.
   @spec discovery_opts(Config.t()) :: keyword()
   defp discovery_opts(%Config{} = config) do
+    jar_alg_values = RequestObjectMetadata.signing_alg_values(config)
+
     [
       response_types_supported: @response_types_supported,
       response_modes_supported: @response_modes_supported,
@@ -181,7 +183,7 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
       # FAPI client reading RFC 8414 rather than OpenID Discovery sees identical
       # JAR support. Both members are nil-dropped by the core builder when JAR
       # is unsupported / not required.
-      request_object_signing_alg_values_supported: RequestObjectMetadata.signing_alg_values(config),
+      request_object_signing_alg_values_supported: jar_alg_values,
       require_signed_request_object: RequestObjectMetadata.require_signed(config)
     ]
   end
