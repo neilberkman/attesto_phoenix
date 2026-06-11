@@ -1587,6 +1587,10 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
         scope: scope,
         subject: subject,
         dpop_jkt: dpop_jkt,
+        # A DPoP (sender-constrained) client is a FAPI client and must use PKCE
+        # (RequestPolicy.require_pkce?/2), so the grant carries an S256 challenge
+        # and the exchange below presents the matching verifier.
+        code_challenge: @code_challenge,
         claims: %{"nonce" => "n-confidential"}
       })
 
@@ -1735,7 +1739,8 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
     params = %{
       "grant_type" => "authorization_code",
       "code" => Process.get(:auth_code),
-      "redirect_uri" => @redirect_uri
+      "redirect_uri" => @redirect_uri,
+      "code_verifier" => @code_verifier
     }
 
     %Plug.Conn{} = base = conn(:post, @endpoint_path, params)

@@ -45,6 +45,7 @@ defmodule AttestoPhoenix.AuthorizationServer.Token do
   """
 
   alias Attesto.{AuthorizationCode, IDToken, RefreshToken}
+  alias AttestoPhoenix.AuthorizationServer.RequestPolicy
   alias AttestoPhoenix.AuthorizationServer.SenderConstraint
   alias AttestoPhoenix.AuthorizationServer.Token.Request
   alias AttestoPhoenix.{Callback, Config, Event, OAuthError}
@@ -235,7 +236,7 @@ defmodule AttestoPhoenix.AuthorizationServer.Token do
   # ── Grant-state delegation (Attesto core) ────────────────────────────────
 
   defp fetch_code_verifier(config, client, params) do
-    if client_public?(config, client) or Callback.config_flag(config, :require_pkce) do
+    if RequestPolicy.require_pkce?(config, client) do
       require_param(params, "code_verifier")
     else
       {:ok, optional_param(params, "code_verifier")}
@@ -741,10 +742,6 @@ defmodule AttestoPhoenix.AuthorizationServer.Token do
   end
 
   # ── Configured-callback access ───────────────────────────────────────────
-
-  defp client_public?(config, client) do
-    Callback.invoke(Config.client_public_fun(config), [client], false) == true
-  end
 
   # The client's identifier (RFC 6749 §2.2). Read defensively so this module
   # works today and lights up when a host supplies `:client_id`. When absent

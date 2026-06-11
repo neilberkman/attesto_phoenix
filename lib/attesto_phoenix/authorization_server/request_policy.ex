@@ -16,6 +16,7 @@ defmodule AttestoPhoenix.AuthorizationServer.RequestPolicy do
 
   alias Attesto.AuthorizationRequest
   alias AttestoPhoenix.{Callback, Config}
+  alias AttestoPhoenix.AuthorizationServer.SenderConstraint
 
   @doc """
   Validate `params` as an authorization request for `client`, resolving the
@@ -61,13 +62,19 @@ defmodule AttestoPhoenix.AuthorizationServer.RequestPolicy do
   Whether PKCE is required for this client (RFC 7636 §4.3 / RFC 9700 §2.1.1).
 
   A public client MUST use PKCE, so `client_public?/2` forces it regardless of
-  config; for a confidential client the global `:require_pkce` flag applies
-  (default `true`). Fail closed: absent the host's deliberate opt-out, PKCE is
-  required.
+  config. A sender-constrained client (DPoP or mTLS) is a FAPI 2.0 client, and
+  FAPI 2.0 Security Profile §5.3.1.2 / RFC 9700 §2.1.1 require PKCE for it even
+  though it authenticates confidentially - so `client_requires_dpop?/2` and
+  `client_requires_mtls?/2` force it too. For any other confidential client the
+  global `:require_pkce` flag applies (default `true`). Fail closed: absent the
+  host's deliberate opt-out, PKCE is required.
   """
   @spec require_pkce?(Config.t(), term()) :: boolean()
   def require_pkce?(config, client) do
-    client_public?(config, client) or Callback.config_flag(config, :require_pkce)
+    client_public?(config, client) or
+      SenderConstraint.client_requires_dpop?(config, client) or
+      SenderConstraint.client_requires_mtls?(config, client) or
+      Callback.config_flag(config, :require_pkce)
   end
 
   @doc """

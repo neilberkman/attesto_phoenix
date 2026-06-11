@@ -20,6 +20,19 @@ project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   to the raw request Host when `:htu` was unset (its default), the one endpoint
   that bypassed the host-header trust boundary.
 
+### Fixed
+
+- **Sender-constrained (DPoP/mTLS) clients now require PKCE.** A FAPI 2.0 client
+  is sender-constrained, and FAPI 2.0 Security Profile §5.3.1.2 / RFC 9700
+  §2.1.1 mandate PKCE for it even though it authenticates confidentially (e.g.
+  `private_key_jwt`). `RequestPolicy.require_pkce?/2` now forces PKCE whenever
+  `client_requires_dpop?`/`client_requires_mtls?` is true, regardless of the
+  global `:require_pkce` flag, and the token endpoint enforces the matching
+  `code_verifier` through that same predicate (one source of truth, so the
+  authorization and token endpoints cannot drift). A plain confidential
+  Basic-profile client still follows the global flag. (Flips the conformance
+  `EnsurePKCERequired` test to a pass.)
+
 ## [0.7.4] - 2026-06-04
 
 Requires `attesto ~> 0.6.13`.
