@@ -170,8 +170,7 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
       grant_types_supported: @grant_types_supported,
       token_endpoint_auth_methods_supported: token_endpoint_auth_methods_supported(config),
       token_endpoint_auth_signing_alg_values_supported: config.client_auth_signing_algs,
-      authorization_response_iss_parameter_supported:
-        authorization_response_iss_parameter_supported(config),
+      authorization_response_iss_parameter_supported: authorization_response_iss_parameter_supported(config),
       scopes_supported: presence(config.scopes_supported),
       require_pushed_authorization_requests: require_pushed_authorization_requests(config),
       pushed_authorization_request_endpoint: pushed_authorization_request_endpoint(config),
@@ -188,14 +187,10 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
     ]
   end
 
-  defp token_endpoint_auth_methods_supported(%Config{
-         token_endpoint_auth_methods_supported: methods
-       })
-       when is_list(methods) and methods != [],
-       do: methods
+  defp token_endpoint_auth_methods_supported(%Config{token_endpoint_auth_methods_supported: methods})
+       when is_list(methods) and methods != [], do: methods
 
-  defp token_endpoint_auth_methods_supported(%Config{}),
-    do: @token_endpoint_auth_methods_supported
+  defp token_endpoint_auth_methods_supported(%Config{}), do: @token_endpoint_auth_methods_supported
 
   # The introspection endpoint authenticates the caller and rejects the public
   # ("none") path (RFC 7662 §2.1), so it advertises the confidential subset of
@@ -237,30 +232,21 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
     end
   end
 
-  defp put_authorization_response_iss_supported(metadata, %Config{
-         authorization_response_iss: true
-       }) do
+  defp put_authorization_response_iss_supported(metadata, %Config{authorization_response_iss: true}) do
     Map.put(metadata, "authorization_response_iss_parameter_supported", true)
   end
 
   defp put_authorization_response_iss_supported(metadata, %Config{}), do: metadata
 
-  defp require_pushed_authorization_requests(%Config{
-         require_pushed_authorization_requests: true
-       }),
-       do: true
+  defp require_pushed_authorization_requests(%Config{require_pushed_authorization_requests: true}), do: true
 
   defp require_pushed_authorization_requests(%Config{}), do: nil
 
-  defp authorization_response_iss_parameter_supported(%Config{
-         authorization_response_iss: true
-       }),
-       do: true
+  defp authorization_response_iss_parameter_supported(%Config{authorization_response_iss: true}), do: true
 
   defp authorization_response_iss_parameter_supported(%Config{}), do: nil
 
-  defp pushed_authorization_request_endpoint(%Config{} = config),
-    do: Config.par_endpoint_url(config)
+  defp pushed_authorization_request_endpoint(%Config{} = config), do: Config.par_endpoint_url(config)
 
   # RFC 7591 §3: advertise the dynamic client registration endpoint only
   # when registration is enabled; otherwise omit the member entirely. The URL
@@ -268,8 +254,7 @@ defmodule AttestoPhoenix.Controller.DiscoveryController do
   # endpoint members are absolute URLs), so it reflects where the host mounted
   # the endpoint rather than a hardcoded `/oauth/register`.
   @spec registration_endpoint(Config.t()) :: String.t() | nil
-  defp registration_endpoint(%Config{registration_enabled: true} = config),
-    do: Config.registration_endpoint_url(config)
+  defp registration_endpoint(%Config{registration_enabled: true} = config), do: Config.registration_endpoint_url(config)
 
   defp registration_endpoint(%Config{registration_enabled: false}), do: nil
 

@@ -11,11 +11,11 @@ defmodule AttestoPhoenix.Store.EctoRefreshStoreTest do
 
   use AttestoPhoenix.DataCase, async: false
 
-  @moduletag :ecto
-
   alias AttestoPhoenix.Schema.RefreshToken
   alias AttestoPhoenix.Store.EctoRefreshStore
   alias Ecto.Adapters.SQL.Sandbox
+
+  @moduletag :ecto
 
   defp entry(attrs \\ %{}) do
     Map.merge(

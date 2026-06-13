@@ -16,9 +16,10 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
   """
   use ExUnit.Case, async: false
 
-  import Plug.Test
   import Plug.Conn
+  import Plug.Test
 
+  alias Attesto.CodeStore.ETS
   alias AttestoPhoenix.Controller.TokenController
 
   @endpoint_path "/oauth/token"
@@ -125,9 +126,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
   end
 
   # One principal kind so `Attesto.Token.mint/3` has a kind to issue under.
-  @client_kind Attesto.PrincipalKind.new("client", "oc_",
-                 required_claims: [{"client_id", :non_empty_string}]
-               )
+  @client_kind Attesto.PrincipalKind.new("client", "oc_", required_claims: [{"client_id", :non_empty_string}])
 
   # Opaque client values; only the configured callbacks interpret them. A
   # client carrying `public?: true` is a public client (RFC 6749 §2.1): it
@@ -489,9 +488,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
       assertion = client_assertion(JOSE.JWK.generate_key({:ec, "P-256"}), "confidential-1")
       other_key = JOSE.JWK.generate_key({:ec, "P-256"})
 
-      put_config(
-        client_jwks: fn %{id: "confidential-1"} -> %{"keys" => [public_jwk(other_key)]} end
-      )
+      put_config(client_jwks: fn %{id: "confidential-1"} -> %{"keys" => [public_jwk(other_key)]} end)
 
       conn =
         post_token(%{
@@ -555,7 +552,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
       # (and an unknown code) both collapse to invalid_grant, never
       # invalid_request - matching the FAPI ensure-pkce-code-verifier-required
       # test (it expects invalid_grant).
-      put_config(code_store: ensure_started(Attesto.CodeStore.ETS))
+      put_config(code_store: ensure_started(ETS))
 
       conn =
         post_token(%{
@@ -1551,7 +1548,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
 
   # A pre-seeded code store: redeeming the issued code returns the given grant.
   defp start_code_store(subject, scope) do
-    store = ensure_started(Attesto.CodeStore.ETS)
+    store = ensure_started(ETS)
 
     {:ok, code} =
       Attesto.AuthorizationCode.issue(store, %{
@@ -1568,7 +1565,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
   end
 
   defp start_unbound_confidential_code_store(subject, scope) do
-    store = ensure_started(Attesto.CodeStore.ETS)
+    store = ensure_started(ETS)
 
     {:ok, code} =
       Attesto.AuthorizationCode.issue(store, %{
@@ -1584,7 +1581,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
   end
 
   defp start_dpop_confidential_code_store(subject, scope, dpop_jkt) do
-    store = ensure_started(Attesto.CodeStore.ETS)
+    store = ensure_started(ETS)
 
     {:ok, code} =
       Attesto.AuthorizationCode.issue(store, %{
@@ -1609,7 +1606,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
   # Authentication Request context (nonce, auth_time, acr, amr) the ID Token
   # binds (OIDC Core §2, §3.1.3.7).
   defp start_openid_code_store(scope, claims) do
-    store = ensure_started(Attesto.CodeStore.ETS)
+    store = ensure_started(ETS)
 
     {:ok, code} =
       Attesto.AuthorizationCode.issue(store, %{
@@ -1627,7 +1624,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
   end
 
   defp start_dpop_code_store(subject, scope, dpop_jkt) do
-    store = ensure_started(Attesto.CodeStore.ETS)
+    store = ensure_started(ETS)
 
     {:ok, code} =
       Attesto.AuthorizationCode.issue(store, %{
@@ -1727,7 +1724,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
     params = %{"grant_type" => grant_type, "client_id" => "public-1", "scope" => "read"}
     %Plug.Conn{} = base = conn(:post, @endpoint_path, params)
 
-    %Plug.Conn{base | scheme: :https, host: "issuer.example", port: 443}
+    %{base | scheme: :https, host: "issuer.example", port: 443}
     |> put_req_header("dpop", proof)
     |> TokenController.create(params)
   end
@@ -1736,7 +1733,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
     params = Map.put(params, "grant_type", "authorization_code")
     %Plug.Conn{} = base = conn(:post, @endpoint_path, params)
 
-    %Plug.Conn{base | scheme: :https, host: "issuer.example", port: 443}
+    %{base | scheme: :https, host: "issuer.example", port: 443}
     |> put_req_header("dpop", proof)
     |> TokenController.create(params)
   end
@@ -1751,7 +1748,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
 
     %Plug.Conn{} = base = conn(:post, @endpoint_path, params)
 
-    %Plug.Conn{base | scheme: :https, host: "issuer.example", port: 443}
+    %{base | scheme: :https, host: "issuer.example", port: 443}
     |> put_req_header("authorization", "Basic " <> Base.encode64("confidential-1:s3cr3t"))
     |> put_req_header("dpop", proof)
     |> TokenController.create(params)
@@ -1766,7 +1763,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
 
     %Plug.Conn{} = base = conn(:post, @endpoint_path, params)
 
-    %Plug.Conn{base | scheme: :https, host: "issuer.example", port: 443}
+    %{base | scheme: :https, host: "issuer.example", port: 443}
     |> put_req_header("authorization", "Basic " <> Base.encode64("confidential-1:s3cr3t"))
     |> put_req_header("dpop", proof)
     |> TokenController.create(params)
@@ -1782,7 +1779,7 @@ defmodule AttestoPhoenix.Controller.TokenControllerTest do
 
     %Plug.Conn{} = base = conn(:post, @endpoint_path, params)
 
-    %Plug.Conn{base | scheme: :https, host: "issuer.example", port: 443}
+    %{base | scheme: :https, host: "issuer.example", port: 443}
     |> put_req_header("dpop", proof)
     |> TokenController.create(params)
   end

@@ -11,11 +11,12 @@ defmodule AttestoPhoenix.ConfigTest do
   # function}` was actually invoked (not just the flat key).
   defmodule FullStore do
     @behaviour AttestoPhoenix.ClientStore
-    @behaviour AttestoPhoenix.PrincipalStore
-    @behaviour AttestoPhoenix.ScopePolicy
     @behaviour AttestoPhoenix.ConsentPolicy
     @behaviour AttestoPhoenix.EventSink
+    @behaviour AttestoPhoenix.PrincipalStore
     @behaviour AttestoPhoenix.RegistrationStore
+    @behaviour AttestoPhoenix.ScopePolicy
+
     # ClaimsProvider's build_principal/3 collides with PrincipalStore's, so this
     # module satisfies ClaimsProvider by exporting the functions without the
     # `@behaviour` annotation (the resolver checks `function_exported?`, not the
@@ -78,6 +79,7 @@ defmodule AttestoPhoenix.ConfigTest do
   # callbacks are absent so the resolver falls through to nil for them.
   defmodule RequiredOnlyStore do
     @behaviour AttestoPhoenix.ClientStore
+
     @impl true
     def load_client(_client_id), do: {:error, :not_found}
     @impl true

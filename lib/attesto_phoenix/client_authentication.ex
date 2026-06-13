@@ -193,9 +193,8 @@ defmodule AttestoPhoenix.ClientAuthentication do
     end
   end
 
-  defp assertion_credentials?(%{"client_assertion" => assertion})
-       when is_binary(assertion) and assertion != "",
-       do: true
+  defp assertion_credentials?(%{"client_assertion" => assertion}) when is_binary(assertion) and assertion != "",
+    do: true
 
   defp assertion_credentials?(_params), do: false
 
@@ -228,10 +227,7 @@ defmodule AttestoPhoenix.ClientAuthentication do
     end
   end
 
-  defp reconcile_basic_client_id(
-         {:ok, :client_secret_basic, basic_id, _secret} = ok,
-         %{"client_id" => body_id}
-       )
+  defp reconcile_basic_client_id({:ok, :client_secret_basic, basic_id, _secret} = ok, %{"client_id" => body_id})
        when is_binary(body_id) and body_id != "" do
     if body_id == basic_id do
       ok
@@ -297,8 +293,7 @@ defmodule AttestoPhoenix.ClientAuthentication do
     end
   end
 
-  defp has_body_secret?(%{"client_secret" => secret}) when is_binary(secret) and secret != "",
-    do: true
+  defp has_body_secret?(%{"client_secret" => secret}) when is_binary(secret) and secret != "", do: true
 
   defp has_body_secret?(_params), do: false
 
@@ -359,8 +354,7 @@ defmodule AttestoPhoenix.ClientAuthentication do
     end
   end
 
-  defp consume_client_assertion_jti(config, policy, client_id, %{"jti" => jti})
-       when is_binary(jti) and jti != "" do
+  defp consume_client_assertion_jti(config, policy, client_id, %{"jti" => jti}) when is_binary(jti) and jti != "" do
     key = client_assertion_replay_key(client_id, jti)
 
     case invoke(replay_check(config), [key, policy.assertion_max_lifetime]) do
@@ -369,8 +363,7 @@ defmodule AttestoPhoenix.ClientAuthentication do
     end
   end
 
-  defp consume_client_assertion_jti(_config, _policy, _client_id, _claims),
-    do: {:error, :missing_jti}
+  defp consume_client_assertion_jti(_config, _policy, _client_id, _claims), do: {:error, :missing_jti}
 
   defp client_assertion_replay_key(client_id, jti) do
     digest = :crypto.hash(:sha256, "#{client_id}\0#{jti}")

@@ -210,11 +210,9 @@ defmodule AttestoPhoenix.Controller.TokenController do
     end
   end
 
-  defp fetch_grant_type(%{"grant_type" => gt}) when is_binary(gt) and gt != "",
-    do: {:ok, gt}
+  defp fetch_grant_type(%{"grant_type" => gt}) when is_binary(gt) and gt != "", do: {:ok, gt}
 
-  defp fetch_grant_type(_params),
-    do: {:error, error(@error_invalid_request, "missing grant_type")}
+  defp fetch_grant_type(_params), do: {:error, error(@error_invalid_request, "missing grant_type")}
 
   # ── Audit / telemetry ────────────────────────────────────────────────────
 
@@ -264,8 +262,7 @@ defmodule AttestoPhoenix.Controller.TokenController do
     Callback.invoke(Config.client_id_fun(config), [client], nil)
   end
 
-  defp request_client_id(conn, params),
-    do: optional_param(params, "client_id") || basic_client_id(conn)
+  defp request_client_id(conn, params), do: optional_param(params, "client_id") || basic_client_id(conn)
 
   defp basic_client_id(conn) do
     with ["Basic " <> encoded] <- get_req_header(conn, "authorization"),

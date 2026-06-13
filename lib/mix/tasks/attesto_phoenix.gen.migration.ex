@@ -76,8 +76,8 @@ defmodule Mix.Tasks.AttestoPhoenix.Gen.Migration do
 
   use Mix.Task
 
-  import Mix.Generator
   import Mix.Ecto, only: [parse_repo: 1, ensure_repo: 2]
+  import Mix.Generator
 
   # Column byte-lengths. Hashes are stored, never the secrets themselves: the
   # caller hashes the authorization code / refresh token / nonce before it
@@ -152,7 +152,7 @@ defmodule Mix.Tasks.AttestoPhoenix.Gen.Migration do
   defp configured_table_prefix(opts) do
     case Keyword.fetch(opts, :otp_app) do
       {:ok, otp_app} ->
-        key = opts |> Keyword.get(:config_key, nil) |> config_key()
+        key = opts |> Keyword.get(:config_key) |> config_key()
 
         otp_app
         |> String.to_atom()
@@ -199,7 +199,7 @@ defmodule Mix.Tasks.AttestoPhoenix.Gen.Migration do
     base_name = "create_attesto_phoenix_tables"
     file = Path.join(path, "#{timestamp()}_#{base_name}.exs")
 
-    unless Enum.empty?(Path.wildcard(Path.join(path, "*_#{base_name}.exs"))) do
+    if !Enum.empty?(Path.wildcard(Path.join(path, "*_#{base_name}.exs"))) do
       Mix.raise(
         "migration #{inspect(base_name)} already exists in #{path}; " <>
           "remove it before regenerating to avoid duplicate tables"

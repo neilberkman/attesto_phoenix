@@ -10,11 +10,11 @@ defmodule AttestoPhoenix.Store.EctoReplayCheckTest do
 
   use AttestoPhoenix.DataCase, async: true
 
-  @moduletag :ecto
-
   alias AttestoPhoenix.Schema.DPoPReplay
   alias AttestoPhoenix.Store.EctoReplayCheck
   alias Ecto.Adapters.SQL.Sandbox
+
+  @moduletag :ecto
 
   describe "check_and_record/2" do
     test "records a fresh jti and returns :ok" do

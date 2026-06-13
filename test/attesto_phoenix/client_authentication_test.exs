@@ -108,27 +108,21 @@ defmodule AttestoPhoenix.ClientAuthenticationTest do
       params = %{"client_id" => "confidential-1"}
 
       assert {:ok, %Result{client: @confidential, method: :client_secret_basic}} =
-               authenticate(basic("confidential-1", "s3cr3t"), params, config,
-                 allow_public: false
-               )
+               authenticate(basic("confidential-1", "s3cr3t"), params, config, allow_public: false)
     end
 
     test "Basic + conflicting body client_id -> invalid_request", %{config: config} do
       params = %{"client_id" => "someone-else"}
 
       assert {:error, %OAuthError{error: :invalid_request}} =
-               authenticate(basic("confidential-1", "s3cr3t"), params, config,
-                 allow_public: false
-               )
+               authenticate(basic("confidential-1", "s3cr3t"), params, config, allow_public: false)
     end
 
     test "Basic + body client_secret -> invalid_request (two credentials)", %{config: config} do
       params = %{"client_id" => "confidential-1", "client_secret" => "s3cr3t"}
 
       assert {:error, %OAuthError{error: :invalid_request}} =
-               authenticate(basic("confidential-1", "s3cr3t"), params, config,
-                 allow_public: false
-               )
+               authenticate(basic("confidential-1", "s3cr3t"), params, config, allow_public: false)
     end
 
     test "Basic + client_assertion -> invalid_request (two credentials)", %{config: config} do
@@ -138,9 +132,7 @@ defmodule AttestoPhoenix.ClientAuthenticationTest do
       }
 
       assert {:error, %OAuthError{error: :invalid_request}} =
-               authenticate(basic("confidential-1", "s3cr3t"), params, config,
-                 allow_public: false
-               )
+               authenticate(basic("confidential-1", "s3cr3t"), params, config, allow_public: false)
     end
   end
 

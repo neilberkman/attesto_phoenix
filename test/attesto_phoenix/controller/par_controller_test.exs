@@ -307,8 +307,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
     params =
       Map.merge(auth_params(), %{
         "client_assertion_type" => Attesto.ClientAssertion.assertion_type(),
-        "client_assertion" =>
-          client_assertion(client_key, "confidential-1", %{"aud" => "https://issuer.example"})
+        "client_assertion" => client_assertion(client_key, "confidential-1", %{"aud" => "https://issuer.example"})
       })
 
     conn =
@@ -355,8 +354,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
     params =
       Map.merge(auth_params(), %{
         "client_assertion_type" => Attesto.ClientAssertion.assertion_type(),
-        "client_assertion" =>
-          client_assertion(client_key, "confidential-1", %{"aud" => "https://other.example"})
+        "client_assertion" => client_assertion(client_key, "confidential-1", %{"aud" => "https://other.example"})
       })
 
     conn =
@@ -474,9 +472,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
     test "default policy accepts a signed request object without nbf/exp" do
       request_key = JOSE.JWK.generate_key({:ec, "P-256"})
 
-      put_config(
-        client_jwks: fn %{id: "confidential-1"} -> %{"keys" => [public_jwk(request_key)]} end
-      )
+      put_config(client_jwks: fn %{id: "confidential-1"} -> %{"keys" => [public_jwk(request_key)]} end)
 
       request =
         signed_request_object(
@@ -575,9 +571,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
     test "stores the verified request-object params, not the unsigned body params (RFC 9101 §6.3)" do
       request_key = JOSE.JWK.generate_key({:ec, "P-256"})
 
-      put_config(
-        client_jwks: fn %{id: "confidential-1"} -> %{"keys" => [public_jwk(request_key)]} end
-      )
+      put_config(client_jwks: fn %{id: "confidential-1"} -> %{"keys" => [public_jwk(request_key)]} end)
 
       # The signed object grants only "openid"; the unsigned body claims more and
       # carries a state the object omits. The stored record must reflect the
@@ -613,9 +607,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
       # value. Verifying the object before DPoP reconciliation makes this so.
       request_key = JOSE.JWK.generate_key({:ec, "P-256"})
 
-      put_config(
-        client_jwks: fn %{id: "confidential-1"} -> %{"keys" => [public_jwk(request_key)]} end
-      )
+      put_config(client_jwks: fn %{id: "confidential-1"} -> %{"keys" => [public_jwk(request_key)]} end)
 
       {proof, _proof_jkt} = dpop_proof()
       signed_jkt = JOSE.JWK.thumbprint(JOSE.JWK.generate_key({:ec, "P-256"}))
@@ -627,7 +619,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
           Map.put(request_claims(), "dpop_jkt", signed_jkt)
         )
 
-      params = Map.merge(auth_params(), %{"request" => request})
+      params = Map.put(auth_params(), "request", request)
       credentials = Base.encode64("confidential-1:s3cr3t")
 
       conn =
@@ -686,7 +678,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
   end
 
   defp par_with_request_object(request) do
-    params = Map.merge(auth_params(), %{"request" => request})
+    params = Map.put(auth_params(), "request", request)
     credentials = Base.encode64("confidential-1:s3cr3t")
 
     :post
@@ -712,7 +704,7 @@ defmodule AttestoPhoenix.Controller.PARControllerTest do
 
   defp https_post(params) do
     %Plug.Conn{} = base = conn(:post, @endpoint_path, params)
-    %Plug.Conn{base | scheme: :https, host: "issuer.example", port: 443}
+    %{base | scheme: :https, host: "issuer.example", port: 443}
   end
 
   defp dpop_proof do

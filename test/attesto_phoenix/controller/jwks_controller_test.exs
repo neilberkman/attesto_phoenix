@@ -4,15 +4,13 @@ defmodule AttestoPhoenix.Controller.JWKSControllerTest do
   # TestKeystore, so these run serially.
   use ExUnit.Case, async: false
 
-  import Plug.Test
   import Plug.Conn
+  import Plug.Test
 
   alias AttestoPhoenix.Config
   alias AttestoPhoenix.Controller.JWKSController
 
-  @principal_kind Attesto.PrincipalKind.new("user", "user:",
-                    required_claims: [{"sub", :non_empty_string}]
-                  )
+  @principal_kind Attesto.PrincipalKind.new("user", "user:", required_claims: [{"sub", :non_empty_string}])
 
   # The configured AttestoPhoenix.Config is read from conn.private under this
   # key by the controller (placed there by the host pipeline in production).

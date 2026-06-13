@@ -119,19 +119,14 @@ defmodule AttestoPhoenix.Schema.RefreshToken do
   so an insert cannot smuggle a token into a consumed or revoked state.
   """
   @spec insert_changeset(t(), map()) :: Ecto.Changeset.t()
-  def insert_changeset(struct \\ %__MODULE__{}, attrs)
-      when is_map(struct) and is_map(attrs) do
+  def insert_changeset(struct \\ %__MODULE__{}, attrs) when is_map(struct) and is_map(attrs) do
     struct
     |> cast(attrs, @permitted)
     |> validate_required(@required)
     |> normalize_scope()
     |> normalize_claims()
-    |> validate_inclusion(:consumed, [false],
-      message: "a new refresh token must be unconsumed (RFC 6749 §6)"
-    )
-    |> validate_inclusion(:family_revoked, [false],
-      message: "a new refresh token must not start revoked"
-    )
+    |> validate_inclusion(:consumed, [false], message: "a new refresh token must be unconsumed (RFC 6749 §6)")
+    |> validate_inclusion(:family_revoked, [false], message: "a new refresh token must not start revoked")
     |> unique_constraint(:token_hash, name: :attesto_refresh_tokens_token_hash_index)
   end
 
@@ -251,8 +246,7 @@ defmodule AttestoPhoenix.Schema.RefreshToken do
   defp nullable_datetime(nil), do: nil
   defp nullable_datetime(%DateTime{} = dt), do: dt
 
-  defp nullable_datetime(seconds) when is_integer(seconds),
-    do: DateTime.from_unix!(seconds, :second)
+  defp nullable_datetime(seconds) when is_integer(seconds), do: DateTime.from_unix!(seconds, :second)
 
   defp to_unix(%DateTime{} = dt), do: DateTime.to_unix(dt, :second)
   defp nullable_unix(nil), do: nil
@@ -280,8 +274,6 @@ defmodule AttestoPhoenix.Schema.RefreshToken do
 
     if is_binary(token) and is_integer(generation) and is_map(context) do
       %{token: token, generation: generation, context: context_from_row(context)}
-    else
-      nil
     end
   end
 
@@ -295,8 +287,7 @@ defmodule AttestoPhoenix.Schema.RefreshToken do
     }
   end
 
-  defp value(map, key) when is_map(map),
-    do: Map.get(map, key) || Map.get(map, Atom.to_string(key))
+  defp value(map, key) when is_map(map), do: Map.get(map, key) || Map.get(map, Atom.to_string(key))
 
   defp decrypt_successor(ciphertext) do
     with {:ok, enc_key, sign_key} <- successor_keys(),

@@ -14,8 +14,8 @@ defmodule AttestoPhoenix.Controller.UserinfoControllerTest do
   """
   use ExUnit.Case, async: false
 
-  import Plug.Test
   import Plug.Conn
+  import Plug.Test
 
   alias Attesto.Token
   alias AttestoPhoenix.Controller.UserinfoController
@@ -52,9 +52,7 @@ defmodule AttestoPhoenix.Controller.UserinfoControllerTest do
   end
 
   # One principal kind so `Attesto.Token.mint/3` has a kind to issue under.
-  @user_kind Attesto.PrincipalKind.new("user", "ou_",
-               required_claims: [{"client_id", :non_empty_string}]
-             )
+  @user_kind Attesto.PrincipalKind.new("user", "ou_", required_claims: [{"client_id", :non_empty_string}])
 
   # The host's claim source. Returns a full profile/email/address/phone claim
   # set keyed by string claim name; the controller shapes it against the
@@ -331,8 +329,7 @@ defmodule AttestoPhoenix.Controller.UserinfoControllerTest do
 
   defp maybe_authorization(conn, nil), do: conn
 
-  defp maybe_authorization(conn, token),
-    do: put_req_header(conn, "authorization", "Bearer " <> token)
+  defp maybe_authorization(conn, token), do: put_req_header(conn, "authorization", "Bearer " <> token)
 
   defp put_config(opts) do
     Application.put_env(:attesto_phoenix, :otp_app, :attesto_phoenix)

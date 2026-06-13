@@ -6,6 +6,11 @@ defmodule AttestoPhoenix.RouterTest do
 
   use ExUnit.Case, async: true
 
+  alias AttestoPhoenix.Controller.AuthorizeController
+  alias AttestoPhoenix.Controller.OpenIDConfigurationController
+  alias AttestoPhoenix.Controller.PARController
+  alias AttestoPhoenix.Controller.UserinfoController
+
   defmodule DefaultRouter do
     use Phoenix.Router
     use AttestoPhoenix.Router
@@ -62,7 +67,7 @@ defmodule AttestoPhoenix.RouterTest do
     test "mounts the OpenID Provider configuration at the well-known path" do
       route = find_route(DefaultRouter, :get, "/.well-known/openid-configuration")
       assert route
-      assert route.plug == AttestoPhoenix.Controller.OpenIDConfigurationController
+      assert route.plug == OpenIDConfigurationController
     end
 
     test "mounts the JWKS document at the well-known path" do
@@ -75,8 +80,8 @@ defmodule AttestoPhoenix.RouterTest do
 
       assert get_route
       assert post_route
-      assert get_route.plug == AttestoPhoenix.Controller.AuthorizeController
-      assert post_route.plug == AttestoPhoenix.Controller.AuthorizeController
+      assert get_route.plug == AuthorizeController
+      assert post_route.plug == AuthorizeController
     end
 
     test "mounts the token endpoint" do
@@ -86,7 +91,7 @@ defmodule AttestoPhoenix.RouterTest do
     test "mounts the pushed authorization request endpoint" do
       route = find_route(DefaultRouter, :post, "/oauth/par")
       assert route
-      assert route.plug == AttestoPhoenix.Controller.PARController
+      assert route.plug == PARController
     end
 
     test "mounts the UserInfo endpoint at both GET and POST (OIDC Core §5.3.1)" do
@@ -95,8 +100,8 @@ defmodule AttestoPhoenix.RouterTest do
 
       assert get_route
       assert post_route
-      assert get_route.plug == AttestoPhoenix.Controller.UserinfoController
-      assert post_route.plug == AttestoPhoenix.Controller.UserinfoController
+      assert get_route.plug == UserinfoController
+      assert post_route.plug == UserinfoController
     end
 
     test "mounts the revocation endpoint" do

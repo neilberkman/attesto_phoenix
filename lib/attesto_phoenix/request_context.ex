@@ -357,17 +357,14 @@ defmodule AttestoPhoenix.RequestContext do
   defp full_prefix(ip) when tuple_size(ip) == 4, do: 32
   defp full_prefix(ip) when tuple_size(ip) == 8, do: 128
 
-  defp valid_prefix?(ip, prefix_len) when tuple_size(ip) == 4,
-    do: prefix_len in 0..32
+  defp valid_prefix?(ip, prefix_len) when tuple_size(ip) == 4, do: prefix_len in 0..32
 
-  defp valid_prefix?(ip, prefix_len) when tuple_size(ip) == 8,
-    do: prefix_len in 0..128
+  defp valid_prefix?(ip, prefix_len) when tuple_size(ip) == 8, do: prefix_len in 0..128
 
   # Containment by integer masking. The network and the candidate must be the
   # same address family (both IPv4 or both IPv6) to match; an IPv4 peer never
   # matches an IPv6 CIDR or vice versa.
-  defp cidr_contains?({network, prefix_len}, candidate)
-       when tuple_size(network) == tuple_size(candidate) do
+  defp cidr_contains?({network, prefix_len}, candidate) when tuple_size(network) == tuple_size(candidate) do
     mask = bitmask(full_prefix(network), prefix_len)
     Bitwise.band(ip_to_integer(network), mask) == Bitwise.band(ip_to_integer(candidate), mask)
   end

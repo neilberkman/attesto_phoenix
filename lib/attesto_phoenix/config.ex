@@ -538,8 +538,7 @@ defmodule AttestoPhoenix.Config do
   defp apply_defaults(%__MODULE__{} = config) do
     %{
       config
-      | client_auth_signing_algs:
-          config.client_auth_signing_algs || Attesto.SigningAlg.fapi_algs(),
+      | client_auth_signing_algs: config.client_auth_signing_algs || Attesto.SigningAlg.fapi_algs(),
         request_object_policy: config.request_object_policy || %Policy{}
     }
   end
@@ -664,16 +663,14 @@ defmodule AttestoPhoenix.Config do
   The resolved request path of the token endpoint. See `authorize_path/1`.
   """
   @spec token_path(t()) :: String.t()
-  def token_path(%__MODULE__{token_path: override} = config),
-    do: resolve_path(override, config, @token_tail)
+  def token_path(%__MODULE__{token_path: override} = config), do: resolve_path(override, config, @token_tail)
 
   @doc """
   The resolved request path of the pushed-authorization-request endpoint
   (RFC 9126). See `authorize_path/1`.
   """
   @spec par_path(t()) :: String.t()
-  def par_path(%__MODULE__{par_path: override} = config),
-    do: resolve_path(override, config, @par_tail)
+  def par_path(%__MODULE__{par_path: override} = config), do: resolve_path(override, config, @par_tail)
 
   @doc """
   The resolved request path of the revocation endpoint (RFC 7009). See
@@ -704,17 +701,14 @@ defmodule AttestoPhoenix.Config do
   §5.3). See `authorize_path/1`.
   """
   @spec userinfo_path(t()) :: String.t()
-  def userinfo_path(%__MODULE__{userinfo_path: override} = config),
-    do: resolve_path(override, config, @userinfo_tail)
+  def userinfo_path(%__MODULE__{userinfo_path: override} = config), do: resolve_path(override, config, @userinfo_tail)
 
   # An explicit per-endpoint override wins over the prefix; otherwise the
   # endpoint path is the prefix joined with the conventional tail. The prefix
   # default `"/oauth"` reproduces the historic surface.
-  defp resolve_path(override, _config, _tail) when is_binary(override) and override != "",
-    do: override
+  defp resolve_path(override, _config, _tail) when is_binary(override) and override != "", do: override
 
-  defp resolve_path(_override, %__MODULE__{oauth_path_prefix: prefix}, tail),
-    do: join_path(prefix, tail)
+  defp resolve_path(_override, %__MODULE__{oauth_path_prefix: prefix}, tail), do: join_path(prefix, tail)
 
   # Join a prefix and a tail into a single absolute path, collapsing the seam so
   # neither a trailing slash on the prefix nor the leading slash on the tail
@@ -731,16 +725,14 @@ defmodule AttestoPhoenix.Config do
   does not supply a separate `:authorization_endpoint`.
   """
   @spec authorize_endpoint_url(t()) :: String.t()
-  def authorize_endpoint_url(%__MODULE__{} = config),
-    do: endpoint_url(config, authorize_path(config))
+  def authorize_endpoint_url(%__MODULE__{} = config), do: endpoint_url(config, authorize_path(config))
 
   @doc """
   Absolute URL of the token endpoint: the issuer merged with `token_path/1`.
   Advertised as `token_endpoint` (RFC 8414 §2).
   """
   @spec token_endpoint_url(t()) :: String.t()
-  def token_endpoint_url(%__MODULE__{} = config),
-    do: endpoint_url(config, token_path(config))
+  def token_endpoint_url(%__MODULE__{} = config), do: endpoint_url(config, token_path(config))
 
   @doc """
   Absolute URL of the pushed-authorization-request endpoint: the issuer merged
@@ -748,8 +740,7 @@ defmodule AttestoPhoenix.Config do
   (RFC 9126 §5).
   """
   @spec par_endpoint_url(t()) :: String.t()
-  def par_endpoint_url(%__MODULE__{} = config),
-    do: endpoint_url(config, par_path(config))
+  def par_endpoint_url(%__MODULE__{} = config), do: endpoint_url(config, par_path(config))
 
   @doc """
   Absolute URL of the revocation endpoint: the issuer merged with
@@ -757,16 +748,14 @@ defmodule AttestoPhoenix.Config do
   RFC 7009).
   """
   @spec revocation_endpoint_url(t()) :: String.t()
-  def revocation_endpoint_url(%__MODULE__{} = config),
-    do: endpoint_url(config, revocation_path(config))
+  def revocation_endpoint_url(%__MODULE__{} = config), do: endpoint_url(config, revocation_path(config))
 
   @doc """
   Absolute URL of the token introspection endpoint (RFC 7662): the issuer merged
   with `introspection_path/1`. Advertised as `introspection_endpoint`.
   """
   @spec introspection_endpoint_url(t()) :: String.t()
-  def introspection_endpoint_url(%__MODULE__{} = config),
-    do: endpoint_url(config, introspection_path(config))
+  def introspection_endpoint_url(%__MODULE__{} = config), do: endpoint_url(config, introspection_path(config))
 
   @doc """
   Absolute URL of the dynamic client registration endpoint: the issuer merged
@@ -774,8 +763,7 @@ defmodule AttestoPhoenix.Config do
   §3) only when registration is enabled.
   """
   @spec registration_endpoint_url(t()) :: String.t()
-  def registration_endpoint_url(%__MODULE__{} = config),
-    do: endpoint_url(config, registration_path(config))
+  def registration_endpoint_url(%__MODULE__{} = config), do: endpoint_url(config, registration_path(config))
 
   @doc """
   Absolute URL of the UserInfo endpoint: the issuer merged with
@@ -783,8 +771,7 @@ defmodule AttestoPhoenix.Config do
   `:userinfo_endpoint`.
   """
   @spec userinfo_endpoint_url(t()) :: String.t()
-  def userinfo_endpoint_url(%__MODULE__{} = config),
-    do: endpoint_url(config, userinfo_path(config))
+  def userinfo_endpoint_url(%__MODULE__{} = config), do: endpoint_url(config, userinfo_path(config))
 
   @doc """
   Absolute URL of an individual registered client's RFC 7592 management
@@ -804,8 +791,7 @@ defmodule AttestoPhoenix.Config do
   so it is NOT relocated by `:oauth_path_prefix`.
   """
   @spec jwks_uri(t()) :: String.t()
-  def jwks_uri(%__MODULE__{} = config),
-    do: endpoint_url(config, "/.well-known/jwks.json")
+  def jwks_uri(%__MODULE__{} = config), do: endpoint_url(config, "/.well-known/jwks.json")
 
   defp endpoint_url(%__MODULE__{issuer: issuer}, path) do
     issuer
@@ -846,8 +832,7 @@ defmodule AttestoPhoenix.Config do
     on_event: {:event_sink, :on_event, 1},
     register_client: {:registration, :register_client, 1},
     unregister_client: {:registration, :unregister_client, 1},
-    client_registration_access_token_hash:
-      {:registration, :client_registration_access_token_hash, 1},
+    client_registration_access_token_hash: {:registration, :client_registration_access_token_hash, 1},
     build_userinfo_claims: {:claims_provider, :build_userinfo_claims, 3},
     build_id_token_claims: {:claims_provider, :build_id_token_claims, 4}
   }
@@ -918,8 +903,7 @@ defmodule AttestoPhoenix.Config do
   helper invokes the resolved callback so consumers do not re-derive it.
   """
   @spec client_store_load(t(), String.t()) :: term()
-  def client_store_load(%__MODULE__{} = config, client_id),
-    do: Callback.invoke(load_client_fun(config), [client_id])
+  def client_store_load(%__MODULE__{} = config, client_id), do: Callback.invoke(load_client_fun(config), [client_id])
 
   @doc """
   Resolve and run the host's constant-time client-secret verification
@@ -1025,9 +1009,7 @@ defmodule AttestoPhoenix.Config do
   # rather than crashing later in `RequestObject.Policy.to_verify_opts/1` when a
   # PAR or /authorize request is verified. `apply_defaults/1` has already
   # replaced a `nil` with `%Attesto.RequestObject.Policy{}`.
-  defp validate_request_object_policy!(
-         %__MODULE__{request_object_policy: %Policy{} = policy} = config
-       ) do
+  defp validate_request_object_policy!(%__MODULE__{request_object_policy: %Policy{} = policy} = config) do
     # A policy that REQUIRES a signed request object (FAPI 2.0 Message Signing
     # §5.3.1) is unsatisfiable without a way to resolve the client's trusted
     # JWKS: every authorization request would be rejected (one carrying no
@@ -1067,7 +1049,7 @@ defmodule AttestoPhoenix.Config do
   end
 
   defp validate_behaviour_module!(store_key, behaviour, module, _config) when is_atom(module) do
-    unless Code.ensure_loaded?(module) do
+    if !Code.ensure_loaded?(module) do
       raise ArgumentError,
             "AttestoPhoenix.Config: #{inspect(store_key)} is set to #{inspect(module)}, " <>
               "which cannot be loaded. Set it to a module implementing " <>
@@ -1075,7 +1057,7 @@ defmodule AttestoPhoenix.Config do
     end
 
     Enum.each(Map.fetch!(@behaviour_required, store_key), fn {fun, arity} ->
-      unless function_exported?(module, fun, arity) do
+      if !function_exported?(module, fun, arity) do
         raise ArgumentError,
               "AttestoPhoenix.Config: #{inspect(store_key)} module #{inspect(module)} " <>
                 "does not export #{fun}/#{arity}, required by #{inspect(behaviour)}."
@@ -1091,11 +1073,9 @@ defmodule AttestoPhoenix.Config do
 
   # The store/callback each required key installs, so a missing-key error tells
   # the host exactly what to wire rather than just naming the key.
-  defp required_key_hint(:issuer),
-    do: "Set it to the https issuer URL (RFC 8414 §2), e.g. \"https://api.example\"."
+  defp required_key_hint(:issuer), do: "Set it to the https issuer URL (RFC 8414 §2), e.g. \"https://api.example\"."
 
-  defp required_key_hint(:keystore),
-    do: "Set it to a module implementing the Attesto.Keystore behaviour."
+  defp required_key_hint(:keystore), do: "Set it to a module implementing the Attesto.Keystore behaviour."
 
   defp required_key_hint(:repo), do: "Set it to your Ecto.Repo module."
 

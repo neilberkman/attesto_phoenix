@@ -79,8 +79,7 @@ defmodule AttestoPhoenix.Store.EctoNonceStore do
 
   @doc "Like `issue/1`, using an explicit `AttestoPhoenix.Config`."
   @spec issue(Config.t(), pos_integer()) :: String.t()
-  def issue(%Config{} = config, ttl_seconds)
-      when is_integer(ttl_seconds) and ttl_seconds > 0 do
+  def issue(%Config{} = config, ttl_seconds) when is_integer(ttl_seconds) and ttl_seconds > 0 do
     repo = repo!(config)
     nonce = :crypto.strong_rand_bytes(@nonce_bytes) |> Base.url_encode64(padding: false)
     now = DateTime.utc_now() |> DateTime.truncate(:second)
@@ -140,8 +139,7 @@ defmodule AttestoPhoenix.Store.EctoNonceStore do
   @doc "Like `accept/2`, using an explicit `AttestoPhoenix.Config`."
   @spec accept(Config.t(), String.t(), pos_integer()) ::
           :ok | {:error, :used | :expired | :unknown}
-  def accept(%Config{} = config, nonce, ttl)
-      when is_binary(nonce) and is_integer(ttl) and ttl > 0 do
+  def accept(%Config{} = config, nonce, ttl) when is_binary(nonce) and is_integer(ttl) and ttl > 0 do
     repo = repo!(config)
     now = DateTime.utc_now() |> DateTime.truncate(:second)
     cutoff = DateTime.add(now, -ttl, :second)
@@ -177,7 +175,7 @@ defmodule AttestoPhoenix.Store.EctoNonceStore do
       {_used_at, issued_at} ->
         # used_at is nil but the conditional update still missed: the only
         # remaining reason is the freshness window (RFC 9449 §8).
-        if DateTime.compare(issued_at, cutoff) == :lt do
+        if DateTime.before?(issued_at, cutoff) do
           {:error, :expired}
         else
           {:error, :unknown}

@@ -70,10 +70,10 @@ if Code.ensure_loaded?(Plug.Conn) do
     This module compiles only when `Plug` is available.
     """
 
+    import Plug.Conn
+
     alias AttestoPhoenix.Callback
     alias AttestoPhoenix.Config
-
-    import Plug.Conn
 
     @typedoc "The protected-resource authentication scheme a challenge names."
     @type scheme :: :bearer | :dpop
@@ -197,8 +197,7 @@ if Code.ensure_loaded?(Plug.Conn) do
     RFC 6749 §5.1 no-store headers, and writes the RFC 6749 §5.2 body.
     """
     @spec unauthorized(Plug.Conn.t(), scheme(), String.t(), keyword()) :: Plug.Conn.t()
-    def unauthorized(conn, scheme, error, opts \\ [])
-        when scheme in [:bearer, :dpop] and is_binary(error) do
+    def unauthorized(conn, scheme, error, opts \\ []) when scheme in [:bearer, :dpop] and is_binary(error) do
       config = fetch_config(conn)
 
       params =
@@ -247,8 +246,7 @@ if Code.ensure_loaded?(Plug.Conn) do
     scopes the request would need. Applies the RFC 6749 §5.1 no-store headers.
     """
     @spec insufficient_scope(Plug.Conn.t(), [String.t()], scheme()) :: Plug.Conn.t()
-    def insufficient_scope(conn, required, scheme \\ :bearer)
-        when is_list(required) and scheme in [:bearer, :dpop] do
+    def insufficient_scope(conn, required, scheme \\ :bearer) when is_list(required) and scheme in [:bearer, :dpop] do
       config = fetch_config(conn)
       scope = Enum.join(required, " ")
       description = "The request requires higher privileges: #{scope}"
@@ -330,8 +328,7 @@ if Code.ensure_loaded?(Plug.Conn) do
       @basic_scheme <> ~s( realm="#{escape(realm)}")
     end
 
-    defp basic_realm(config) when is_map(config),
-      do: Map.get(config, :basic_realm) || @default_realm
+    defp basic_realm(config) when is_map(config), do: Map.get(config, :basic_realm) || @default_realm
 
     defp basic_realm(_config), do: @default_realm
 
@@ -385,8 +382,7 @@ if Code.ensure_loaded?(Plug.Conn) do
 
     defp error_body(error, nil), do: %{"error" => error}
 
-    defp error_body(error, description),
-      do: %{"error" => error, "error_description" => description}
+    defp error_body(error, description), do: %{"error" => error, "error_description" => description}
 
     defp append_param(params, _key, nil), do: params
     defp append_param(params, key, value), do: params ++ [{key, value}]

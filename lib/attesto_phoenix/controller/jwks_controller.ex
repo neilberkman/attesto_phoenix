@@ -93,8 +93,7 @@ defmodule AttestoPhoenix.Controller.JWKSController do
     Config.to_attesto_config(config, principal_kinds_extra(config))
   end
 
-  defp principal_kinds_extra(%Config{principal_kinds: kinds})
-       when is_list(kinds) and kinds != [] do
+  defp principal_kinds_extra(%Config{principal_kinds: kinds}) when is_list(kinds) and kinds != [] do
     [principal_kinds: kinds]
   end
 

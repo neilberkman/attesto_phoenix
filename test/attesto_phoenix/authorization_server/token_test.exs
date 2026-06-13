@@ -38,9 +38,7 @@ defmodule AttestoPhoenix.AuthorizationServer.TokenTest do
   end
 
   # One principal kind so `Attesto.Token.mint/3` has a kind to issue under.
-  @client_kind Attesto.PrincipalKind.new("client", "oc_",
-                 required_claims: [{"client_id", :non_empty_string}]
-               )
+  @client_kind Attesto.PrincipalKind.new("client", "oc_", required_claims: [{"client_id", :non_empty_string}])
 
   @client %{id: "client-1", public?: false}
 

@@ -9,8 +9,8 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
   """
   use ExUnit.Case, async: false
 
-  import Plug.Conn
   import Phoenix.ConnTest
+  import Plug.Conn
 
   alias Attesto.AuthorizationCode
   alias Attesto.RequestObject.Policy
@@ -124,7 +124,11 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
   end
 
   defp location_query(conn) do
-    case conn |> location() |> URI.parse() |> Map.get(:query) do
+    conn
+    |> location()
+    |> URI.parse()
+    |> Map.get(:query)
+    |> case do
       nil -> %{}
       query -> URI.decode_query(query)
     end
@@ -201,7 +205,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
     end
 
     test "omits state when the request carried none" do
-      conn = call(valid_params(%{}) |> Map.delete("state"))
+      conn = valid_params(%{}) |> Map.delete("state") |> call()
 
       assert conn.status == 302
       refute Map.has_key?(location_query(conn), "state")
@@ -479,7 +483,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
     end
 
     test "missing client_id renders a direct 400" do
-      conn = call(valid_params(%{}) |> Map.delete("client_id"))
+      conn = valid_params(%{}) |> Map.delete("client_id") |> call()
 
       assert conn.status == 400
       assert get_resp_header(conn, "location") == []
@@ -497,9 +501,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
         build_conn()
         |> Map.put(:scheme, :https)
         |> put_req_header("accept", "text/html")
-        |> AuthorizeController.authorize(
-          valid_params(%{"redirect_uri" => "https://evil.example.com/cb"})
-        )
+        |> AuthorizeController.authorize(valid_params(%{"redirect_uri" => "https://evil.example.com/cb"}))
 
       assert conn.status == 400
       assert get_resp_header(conn, "location") == []
@@ -509,7 +511,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
     end
 
     test "missing redirect_uri renders a direct 400" do
-      conn = call(valid_params(%{}) |> Map.delete("redirect_uri"))
+      conn = valid_params(%{}) |> Map.delete("redirect_uri") |> call()
 
       assert conn.status == 400
       assert get_resp_header(conn, "location") == []
@@ -540,7 +542,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
     end
 
     test "missing PKCE challenge redirects with invalid_request" do
-      conn = call(valid_params(%{}) |> Map.delete("code_challenge"))
+      conn = valid_params(%{}) |> Map.delete("code_challenge") |> call()
 
       assert conn.status == 302
       assert location_query(conn)["error"] == "invalid_request"
@@ -583,7 +585,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
     test "can include RFC 9207 iss in authorization error responses" do
       put_config(authorization_response_iss: true)
 
-      conn = call(valid_params(%{}) |> Map.delete("code_challenge"))
+      conn = valid_params(%{}) |> Map.delete("code_challenge") |> call()
 
       assert conn.status == 302
       query = location_query(conn)
@@ -628,8 +630,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
     test "an unauthenticated owner has the connection handed to the host (no code)" do
       put_config(
         authenticate_resource_owner: fn conn, _request, _opts ->
-          {:halt,
-           conn |> Plug.Conn.put_resp_header("location", "/login") |> Plug.Conn.send_resp(302, "")}
+          {:halt, conn |> Plug.Conn.put_resp_header("location", "/login") |> Plug.Conn.send_resp(302, "")}
         end
       )
 
@@ -691,7 +692,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
     test "an OIDC request without a nonce is rejected when require_nonce is set" do
       put_config(require_nonce: true)
 
-      conn = call(valid_params(%{}) |> Map.delete("nonce"))
+      conn = valid_params(%{}) |> Map.delete("nonce") |> call()
 
       assert conn.status == 302
       query = location_query(conn)
@@ -715,14 +716,14 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
       # nonce requirement does not apply (RFC 6749 keeps the code at SHOULD).
       put_config(require_nonce: true)
 
-      conn = call(valid_params(%{"scope" => "profile"}) |> Map.delete("nonce"))
+      conn = valid_params(%{"scope" => "profile"}) |> Map.delete("nonce") |> call()
 
       assert conn.status == 302
       assert is_binary(location_query(conn)["code"])
     end
 
     test "an OIDC request without a nonce succeeds when require_nonce is unset (default)" do
-      conn = call(valid_params(%{}) |> Map.delete("nonce"))
+      conn = valid_params(%{}) |> Map.delete("nonce") |> call()
 
       assert conn.status == 302
       assert is_binary(location_query(conn)["code"])
@@ -764,8 +765,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeControllerTest do
       # to its login page, the controller reports login_required instead.
       put_config(
         authenticate_resource_owner: fn conn, _request, _opts ->
-          {:halt,
-           conn |> Plug.Conn.put_resp_header("location", "/login") |> Plug.Conn.send_resp(302, "")}
+          {:halt, conn |> Plug.Conn.put_resp_header("location", "/login") |> Plug.Conn.send_resp(302, "")}
         end
       )
 

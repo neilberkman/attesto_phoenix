@@ -45,9 +45,10 @@ defmodule AttestoPhoenix.Controller.IntrospectionController do
   alias Attesto.SignedIntrospection
   alias AttestoPhoenix.{Callback, ClientAuthentication, Config, OAuthError, RequestContext}
   alias AttestoPhoenix.ClientAuthentication.Policy
-
   # RFC 9701 §4: the media type a caller requests (via Accept) to receive the
   # introspection response as a signed JWT, and the type of that response.
+  alias AttestoPhoenix.Store.EctoRefreshStore
+
   @signed_media_type "application/token-introspection+jwt"
 
   # RFC 7523 §3: the maximum client-assertion lifetime, matching the token
@@ -56,7 +57,7 @@ defmodule AttestoPhoenix.Controller.IntrospectionController do
 
   # The Attesto.RefreshStore consulted for opaque refresh tokens, defaulting to
   # the package's Ecto-backed store when the host configures none.
-  @default_refresh_store AttestoPhoenix.Store.EctoRefreshStore
+  @default_refresh_store EctoRefreshStore
 
   @cache_control_no_store "no-store"
   @pragma_no_cache "no-cache"
@@ -134,7 +135,11 @@ defmodule AttestoPhoenix.Controller.IntrospectionController do
 
   defp quality(params) do
     Enum.find_value(params, 1.0, fn param ->
-      case param |> String.trim() |> String.downcase() |> String.split("=", parts: 2) do
+      param
+      |> String.trim()
+      |> String.downcase()
+      |> String.split("=", parts: 2)
+      |> case do
         ["q", value] -> parse_q(value)
         _ -> nil
       end
@@ -151,15 +156,12 @@ defmodule AttestoPhoenix.Controller.IntrospectionController do
   defp fetch_token(%{"token" => token}) when is_binary(token) and token != "", do: {:ok, token}
 
   defp fetch_token(_params),
-    do:
-      {:error,
-       error(@error_invalid_request, "the request is missing the required \"token\" parameter")}
+    do: {:error, error(@error_invalid_request, "the request is missing the required \"token\" parameter")}
 
   defp token_type_hint(%{"token_type_hint" => hint}) when is_binary(hint) and hint != "", do: hint
   defp token_type_hint(_params), do: nil
 
-  defp refresh_store(%Config{refresh_store: store}) when is_atom(store) and not is_nil(store),
-    do: store
+  defp refresh_store(%Config{refresh_store: store}) when is_atom(store) and not is_nil(store), do: store
 
   defp refresh_store(%Config{}), do: @default_refresh_store
 
@@ -216,8 +218,7 @@ defmodule AttestoPhoenix.Controller.IntrospectionController do
   defp error_body(code, nil), do: %{error: code}
   defp error_body(code, description), do: %{error: code, error_description: description}
 
-  defp error(code, description),
-    do: OAuthError.new(String.to_existing_atom(code), description, status: 400)
+  defp error(code, description), do: OAuthError.new(String.to_existing_atom(code), description, status: 400)
 
   defp put_no_store_headers(conn) do
     conn

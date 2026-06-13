@@ -133,8 +133,7 @@ defmodule AttestoPhoenix.Schema.AuthorizationTest do
       # a NULL method - never a spurious "S256" for a challenge that is not there.
       data =
         base_data()
-        |> Map.delete(:code_challenge)
-        |> Map.delete(:code_challenge_method)
+        |> Map.drop([:code_challenge, :code_challenge_method])
 
       changeset =
         base_record()

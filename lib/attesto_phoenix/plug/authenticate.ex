@@ -79,8 +79,7 @@ defmodule AttestoPhoenix.Plug.Authenticate do
     end
   end
 
-  defp access_token_revoked?(%Config{code_store: store}, %{"jti" => jti})
-       when is_atom(store) and is_binary(jti) do
+  defp access_token_revoked?(%Config{code_store: store}, %{"jti" => jti}) when is_atom(store) and is_binary(jti) do
     function_exported?(store, :access_token_revoked?, 1) and store.access_token_revoked?(jti)
   end
 
@@ -117,8 +116,7 @@ defmodule AttestoPhoenix.Plug.Authenticate do
     }
   end
 
-  defp scope(%{"scope" => scope}) when is_binary(scope),
-    do: String.split(scope, ~r/\s+/, trim: true)
+  defp scope(%{"scope" => scope}) when is_binary(scope), do: String.split(scope, ~r/\s+/, trim: true)
 
   defp scope(_claims), do: []
 
@@ -152,8 +150,7 @@ defmodule AttestoPhoenix.Plug.Authenticate do
     Config.to_attesto_config(config, principal_kinds_extra(config))
   end
 
-  defp principal_kinds_extra(%Config{principal_kinds: kinds})
-       when is_list(kinds) and kinds != [] do
+  defp principal_kinds_extra(%Config{principal_kinds: kinds}) when is_list(kinds) and kinds != [] do
     [principal_kinds: kinds]
   end
 
@@ -170,8 +167,7 @@ defmodule AttestoPhoenix.Plug.Authenticate do
   defp replay_check(%Config{replay_check: nil}), do: &ReplayCache.check_and_record/2
   defp replay_check(%Config{replay_check: callback}), do: callback
 
-  defp nonce_check(%Config{dpop_nonce_required: true, nonce_store: store})
-       when is_atom(store) and not is_nil(store) do
+  defp nonce_check(%Config{dpop_nonce_required: true, nonce_store: store}) when is_atom(store) and not is_nil(store) do
     fn nonce ->
       if store.valid?(nonce), do: :ok, else: {:error, :use_dpop_nonce}
     end
@@ -179,8 +175,7 @@ defmodule AttestoPhoenix.Plug.Authenticate do
 
   defp nonce_check(_config), do: nil
 
-  defp nonce_issue(%Config{dpop_nonce_required: true, nonce_store: store})
-       when is_atom(store) and not is_nil(store) do
+  defp nonce_issue(%Config{dpop_nonce_required: true, nonce_store: store}) when is_atom(store) and not is_nil(store) do
     &store.issue/0
   end
 

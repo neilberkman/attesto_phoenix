@@ -144,9 +144,7 @@ defmodule AttestoPhoenix.OAuthErrorTest do
   describe "unauthorized/4 (RFC 6750 §3 / RFC 9449 §7.1 challenges)" do
     test "emits a Bearer challenge with error and description" do
       conn =
-        OAuthError.unauthorized(conn(), :bearer, "invalid_token",
-          description: "The access token expired."
-        )
+        OAuthError.unauthorized(conn(), :bearer, "invalid_token", description: "The access token expired.")
 
       assert conn.status == 401
 
@@ -176,9 +174,7 @@ defmodule AttestoPhoenix.OAuthErrorTest do
 
     test "includes a scope auth-param when supplied" do
       conn =
-        OAuthError.unauthorized(conn(), :bearer, "insufficient_scope",
-          scope: "tokens.read tokens.write"
-        )
+        OAuthError.unauthorized(conn(), :bearer, "insufficient_scope", scope: "tokens.read tokens.write")
 
       assert header(conn, "www-authenticate") == [
                ~s(Bearer error="insufficient_scope", scope="tokens.read tokens.write")
@@ -193,9 +189,7 @@ defmodule AttestoPhoenix.OAuthErrorTest do
 
     test "escapes quotes and backslashes in auth-param values" do
       conn =
-        OAuthError.unauthorized(conn(), :bearer, "invalid_token",
-          description: ~s(quote " and back \\ slash)
-        )
+        OAuthError.unauthorized(conn(), :bearer, "invalid_token", description: ~s(quote " and back \\ slash))
 
       assert header(conn, "www-authenticate") == [
                ~s(Bearer error="invalid_token", error_description="quote \\" and back \\\\ slash")

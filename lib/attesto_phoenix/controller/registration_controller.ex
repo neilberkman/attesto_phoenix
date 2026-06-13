@@ -288,8 +288,7 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
     if Enum.all?(value, &is_binary/1) do
       {:ok, value}
     else
-      {:error,
-       error(@error_invalid_client_metadata, "contacts must be an array of strings (RFC 7591 §2)")}
+      {:error, error(@error_invalid_client_metadata, "contacts must be an array of strings (RFC 7591 §2)")}
     end
   end
 
@@ -324,8 +323,7 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
         end
 
       _ ->
-        {:error,
-         error(@error_invalid_client_metadata, "token_endpoint_auth_method must be a string")}
+        {:error, error(@error_invalid_client_metadata, "token_endpoint_auth_method must be a string")}
     end
   end
 
@@ -431,8 +429,7 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
             {:ok, scope}
 
           [unknown | _] ->
-            {:error,
-             error(@error_invalid_client_metadata, "scope #{inspect(unknown)} is unknown")}
+            {:error, error(@error_invalid_client_metadata, "scope #{inspect(unknown)} is unknown")}
         end
 
       _ ->
@@ -493,8 +490,7 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
         # A store-level rejection (constraint violation, unacceptable metadata)
         # is a client problem, not a server fault: render it as RFC 7591 §3.2.2
         # invalid_client_metadata rather than a 500.
-        {:error,
-         error(@error_invalid_client_metadata, "the requested client could not be registered")}
+        {:error, error(@error_invalid_client_metadata, "the requested client could not be registered")}
     end
   end
 
@@ -504,10 +500,7 @@ defmodule AttestoPhoenix.Controller.RegistrationController do
     |> put_registration_access_token_hash()
     # Response-only members (RFC 7591 §3.2.1 / RFC 7592 §2.1), not client
     # metadata, so they are not handed to the host persistence callback.
-    |> Map.delete("client_secret")
-    |> Map.delete("client_secret_expires_at")
-    |> Map.delete("registration_access_token")
-    |> Map.delete("registration_client_uri")
+    |> Map.drop(["client_secret", "client_secret_expires_at", "registration_access_token", "registration_client_uri"])
   end
 
   defp put_client_secret_hash(issued) do

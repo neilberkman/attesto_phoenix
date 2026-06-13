@@ -205,8 +205,7 @@ defmodule AttestoPhoenix.Controller.UserinfoController do
   defp scheme_of(%{"cnf" => %{"jkt" => jkt}}) when is_binary(jkt), do: :dpop
   defp scheme_of(_claims), do: :bearer
 
-  defp access_token_revoked?(%Config{code_store: store}, %{"jti" => jti})
-       when is_atom(store) and is_binary(jti) do
+  defp access_token_revoked?(%Config{code_store: store}, %{"jti" => jti}) when is_atom(store) and is_binary(jti) do
     function_exported?(store, :access_token_revoked?, 1) and store.access_token_revoked?(jti)
   end
 
@@ -296,8 +295,7 @@ defmodule AttestoPhoenix.Controller.UserinfoController do
     Config.to_attesto_config(config, principal_kinds_extra(config))
   end
 
-  defp principal_kinds_extra(%Config{principal_kinds: kinds})
-       when is_list(kinds) and kinds != [] do
+  defp principal_kinds_extra(%Config{principal_kinds: kinds}) when is_list(kinds) and kinds != [] do
     [principal_kinds: kinds]
   end
 
@@ -321,8 +319,7 @@ defmodule AttestoPhoenix.Controller.UserinfoController do
   # and has wired a nonce store. The callback receives the proof's `nonce`
   # (possibly `nil`) and returns `:ok` only for a currently-valid nonce, else
   # `{:error, :use_dpop_nonce}`; this mirrors the token endpoint exactly.
-  defp nonce_check(%Config{dpop_nonce_required: true, nonce_store: store})
-       when is_atom(store) and not is_nil(store) do
+  defp nonce_check(%Config{dpop_nonce_required: true, nonce_store: store}) when is_atom(store) and not is_nil(store) do
     fn nonce ->
       if store.valid?(nonce), do: :ok, else: {:error, :use_dpop_nonce}
     end
@@ -333,8 +330,7 @@ defmodule AttestoPhoenix.Controller.UserinfoController do
   # RFC 9449 §8: the `use_dpop_nonce` challenge carries a fresh nonce for the
   # client to echo; `Attesto.Plug.Authenticate` requires `:nonce_issue`
   # whenever `:nonce_check` is set.
-  defp nonce_issue(%Config{dpop_nonce_required: true, nonce_store: store})
-       when is_atom(store) and not is_nil(store) do
+  defp nonce_issue(%Config{dpop_nonce_required: true, nonce_store: store}) when is_atom(store) and not is_nil(store) do
     &store.issue/0
   end
 

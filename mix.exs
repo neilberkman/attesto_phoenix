@@ -2,6 +2,24 @@ defmodule AttestoPhoenix.MixProject do
   @moduledoc false
   use Mix.Project
 
+  alias AttestoPhoenix.Controller.DiscoveryController
+  alias AttestoPhoenix.Controller.JWKSController
+  alias AttestoPhoenix.Controller.PARController
+  alias AttestoPhoenix.Controller.RegistrationController
+  alias AttestoPhoenix.Controller.RevocationController
+  alias AttestoPhoenix.Controller.TokenController
+  alias AttestoPhoenix.Controller.UserinfoController
+  alias AttestoPhoenix.Schema.Authorization
+  alias AttestoPhoenix.Schema.DPoPNonce
+  alias AttestoPhoenix.Schema.DPoPReplay
+  alias AttestoPhoenix.Schema.RefreshToken
+  alias AttestoPhoenix.Store.EctoCodeStore
+  alias AttestoPhoenix.Store.EctoNonceStore
+  alias AttestoPhoenix.Store.EctoRefreshStore
+  alias AttestoPhoenix.Store.EctoReplayCheck
+  alias AttestoPhoenix.Store.PAR.ETS
+  alias AttestoPhoenix.Store.Sweeper
+
   @version "0.7.6"
   @url "https://github.com/XukuLLC/attesto_phoenix"
   @maintainers ["Neil Berkman"]
@@ -143,27 +161,27 @@ defmodule AttestoPhoenix.MixProject do
           AttestoPhoenix.EventSink
         ],
         Controllers: [
-          AttestoPhoenix.Controller.TokenController,
-          AttestoPhoenix.Controller.RevocationController,
-          AttestoPhoenix.Controller.DiscoveryController,
-          AttestoPhoenix.Controller.JWKSController,
-          AttestoPhoenix.Controller.PARController,
-          AttestoPhoenix.Controller.RegistrationController,
-          AttestoPhoenix.Controller.UserinfoController
+          TokenController,
+          RevocationController,
+          DiscoveryController,
+          JWKSController,
+          PARController,
+          RegistrationController,
+          UserinfoController
         ],
         Stores: [
-          AttestoPhoenix.Store.EctoCodeStore,
-          AttestoPhoenix.Store.EctoRefreshStore,
-          AttestoPhoenix.Store.EctoReplayCheck,
-          AttestoPhoenix.Store.EctoNonceStore,
-          AttestoPhoenix.Store.PAR.ETS,
-          AttestoPhoenix.Store.Sweeper
+          EctoCodeStore,
+          EctoRefreshStore,
+          EctoReplayCheck,
+          EctoNonceStore,
+          ETS,
+          Sweeper
         ],
         Schemas: [
-          AttestoPhoenix.Schema.Authorization,
-          AttestoPhoenix.Schema.RefreshToken,
-          AttestoPhoenix.Schema.DPoPReplay,
-          AttestoPhoenix.Schema.DPoPNonce
+          Authorization,
+          RefreshToken,
+          DPoPReplay,
+          DPoPNonce
         ],
         Shared: [
           AttestoPhoenix.OAuthError,

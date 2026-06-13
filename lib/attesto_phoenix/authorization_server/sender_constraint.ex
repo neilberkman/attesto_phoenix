@@ -150,7 +150,7 @@ defmodule AttestoPhoenix.AuthorizationServer.SenderConstraint do
   """
   @spec refresh_binding_jkt(Config.t(), term(), binding()) :: String.t() | nil
   def refresh_binding_jkt(%Config{} = config, client, binding) do
-    if client_public?(config, client), do: binding_jkt(binding), else: nil
+    if client_public?(config, client), do: binding_jkt(binding)
   end
 
   @doc """
@@ -239,8 +239,7 @@ defmodule AttestoPhoenix.AuthorizationServer.SenderConstraint do
   # `:ok` only for a currently-valid nonce, else `{:error, :use_dpop_nonce}`
   # so the controller answers with a fresh `DPoP-Nonce`. When nonces are not
   # required, no callback is supplied and the engine enforces none.
-  defp nonce_check(%Config{dpop_nonce_required: true, nonce_store: store})
-       when is_atom(store) and not is_nil(store) do
+  defp nonce_check(%Config{dpop_nonce_required: true, nonce_store: store}) when is_atom(store) and not is_nil(store) do
     fn nonce ->
       if store.valid?(nonce), do: :ok, else: {:error, :use_dpop_nonce}
     end

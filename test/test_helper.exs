@@ -6,9 +6,9 @@
 # needs no running SQL server. Each table has its own migration file under
 # test/support/migrations, one migration module per file.
 
-ExUnit.configure(exclude: [:ecto])
-
 alias AttestoPhoenix.TestRepo
+
+ExUnit.configure(exclude: [:ecto])
 
 ecto_included? =
   ExUnit.configuration()

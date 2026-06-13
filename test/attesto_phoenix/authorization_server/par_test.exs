@@ -300,7 +300,7 @@ defmodule AttestoPhoenix.AuthorizationServer.PARTest do
       config = config()
 
       params =
-        base_params() |> Map.delete("code_challenge") |> Map.delete("code_challenge_method")
+        base_params() |> Map.drop(["code_challenge", "code_challenge_method"])
 
       assert {:error, %OAuthError{error: :invalid_request, status: 400}} =
                PAR.store(config, request(params: params))

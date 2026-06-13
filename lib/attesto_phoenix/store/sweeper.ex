@@ -149,8 +149,7 @@ defmodule AttestoPhoenix.Store.Sweeper do
     now = DateTime.utc_now()
 
     %{
-      @authorization_codes =>
-        delete_expired(repo, expired_query(@authorization_codes, now), prefix),
+      @authorization_codes => delete_expired(repo, expired_query(@authorization_codes, now), prefix),
       @refresh_tokens => delete_expired(repo, expired_query(@refresh_tokens, now), prefix),
       @dpop_nonces => delete_expired(repo, expired_query(@dpop_nonces, now), prefix),
       @dpop_replays => delete_expired(repo, expired_query(@dpop_replays, now), prefix)
@@ -160,17 +159,13 @@ defmodule AttestoPhoenix.Store.Sweeper do
   # `from/2` requires a literal string source, so each generated table gets its
   # own clause keyed off the compile-time module attribute. All four clauses are
   # the identical strict `WHERE expires_at < $now` predicate.
-  defp expired_query(@authorization_codes, now),
-    do: from(r in @authorization_codes, where: r.expires_at < ^now)
+  defp expired_query(@authorization_codes, now), do: from(r in @authorization_codes, where: r.expires_at < ^now)
 
-  defp expired_query(@refresh_tokens, now),
-    do: from(r in @refresh_tokens, where: r.expires_at < ^now)
+  defp expired_query(@refresh_tokens, now), do: from(r in @refresh_tokens, where: r.expires_at < ^now)
 
-  defp expired_query(@dpop_nonces, now),
-    do: from(r in @dpop_nonces, where: r.expires_at < ^now)
+  defp expired_query(@dpop_nonces, now), do: from(r in @dpop_nonces, where: r.expires_at < ^now)
 
-  defp expired_query(@dpop_replays, now),
-    do: from(r in @dpop_replays, where: r.expires_at < ^now)
+  defp expired_query(@dpop_replays, now), do: from(r in @dpop_replays, where: r.expires_at < ^now)
 
   defp delete_expired(repo, query, prefix) do
     {deleted, _} = repo.delete_all(query, prefix: prefix)
@@ -197,8 +192,7 @@ defmodule AttestoPhoenix.Store.Sweeper do
     end
   end
 
-  defp sweep_interval_ms!(%Config{sweep_interval_ms: interval})
-       when is_integer(interval) and interval > 0 do
+  defp sweep_interval_ms!(%Config{sweep_interval_ms: interval}) when is_integer(interval) and interval > 0 do
     interval
   end
 

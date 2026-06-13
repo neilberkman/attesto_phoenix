@@ -3,8 +3,8 @@ defmodule AttestoPhoenix.Controller.IntrospectionControllerTest do
   # Installs config into the application env, so not async-safe.
   use ExUnit.Case, async: false
 
-  import Plug.Test
   import Plug.Conn
+  import Plug.Test
 
   alias Attesto.Token
   alias AttestoPhoenix.Config

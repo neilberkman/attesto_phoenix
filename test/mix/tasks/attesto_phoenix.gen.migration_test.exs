@@ -21,9 +21,7 @@ defmodule Mix.Tasks.AttestoPhoenix.Gen.MigrationTest do
   defp run!(args, tmp_dir) do
     # inspect/1 renders the module without the "Elixir." prefix, which is the
     # spelling Mix.Ecto.parse_repo/1 expects for --repo.
-    Migration.run(
-      ["--repo", inspect(TestRepo), "--migrations-path", migrations_dir(tmp_dir)] ++ args
-    )
+    Migration.run(["--repo", inspect(TestRepo), "--migrations-path", migrations_dir(tmp_dir)] ++ args)
   end
 
   defp generated_migration(tmp_dir) do

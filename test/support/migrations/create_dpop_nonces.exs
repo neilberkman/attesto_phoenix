@@ -21,8 +21,6 @@ defmodule AttestoPhoenix.TestRepo.Migrations.CreateDPoPNonces do
 
     create(unique_index(:dpop_nonces, [:nonce]))
 
-    create(
-      index(:dpop_nonces, [:used_at], where: "used_at IS NULL", name: :dpop_nonces_unused_index)
-    )
+    create(index(:dpop_nonces, [:used_at], where: "used_at IS NULL", name: :dpop_nonces_unused_index))
   end
 end

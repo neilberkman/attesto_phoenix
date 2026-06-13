@@ -376,15 +376,7 @@ defmodule AttestoPhoenix.AuthorizationServer.Token do
     end
   end
 
-  defp issue_initial_refresh_token(
-         request,
-         grant,
-         scope,
-         binding,
-         refresh_store,
-         response,
-         events
-       ) do
+  defp issue_initial_refresh_token(request, grant, scope, binding, refresh_store, response, events) do
     %{config: config, client: client} = request
 
     context =
@@ -690,8 +682,7 @@ defmodule AttestoPhoenix.AuthorizationServer.Token do
 
   defp access_token_claims(_grant), do: %{}
 
-  defp merge_principal_claims(principal, extra_claims) when map_size(extra_claims) == 0,
-    do: principal
+  defp merge_principal_claims(principal, extra_claims) when map_size(extra_claims) == 0, do: principal
 
   defp merge_principal_claims(principal, extra_claims) do
     claims =
@@ -854,9 +845,7 @@ defmodule AttestoPhoenix.AuthorizationServer.Token do
   # specific internal reason is not exposed to the client. Reuse detection is
   # also invalid_grant on the wire (the family is already revoked in the
   # store), so a captured-token replay learns nothing.
-  defp grant_error(:invalid_scope),
-    do: error(@error_invalid_scope, "requested scope exceeds the grant")
+  defp grant_error(:invalid_scope), do: error(@error_invalid_scope, "requested scope exceeds the grant")
 
-  defp grant_error(_reason),
-    do: error(@error_invalid_grant, "authorization grant is invalid or expired")
+  defp grant_error(_reason), do: error(@error_invalid_grant, "authorization grant is invalid or expired")
 end

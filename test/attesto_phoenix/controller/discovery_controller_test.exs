@@ -1,8 +1,8 @@
 defmodule AttestoPhoenix.Controller.DiscoveryControllerTest do
   use ExUnit.Case, async: true
 
-  import Plug.Test
   import Plug.Conn
+  import Plug.Test
 
   alias Attesto.Config, as: ProtocolConfig
   alias Attesto.PrincipalKind

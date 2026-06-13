@@ -14,6 +14,7 @@ defmodule AttestoPhoenix.AuthorizationServer.SenderConstraintTest do
   """
   use ExUnit.Case, async: false
 
+  alias Attesto.DPoP.NonceStore.ETS
   alias AttestoPhoenix.AuthorizationServer.SenderConstraint
   alias AttestoPhoenix.{Config, OAuthError}
 
@@ -139,7 +140,7 @@ defmodule AttestoPhoenix.AuthorizationServer.SenderConstraintTest do
 
   describe "DPoP nonce challenge (RFC 9449 §8 / §9)" do
     setup do
-      store = Attesto.DPoP.NonceStore.ETS
+      store = ETS
       start_supervised!(store)
       {:ok, store: store}
     end

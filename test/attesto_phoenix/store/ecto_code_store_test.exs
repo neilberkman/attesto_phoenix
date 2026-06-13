@@ -13,11 +13,11 @@ defmodule AttestoPhoenix.Store.EctoCodeStoreTest do
 
   use AttestoPhoenix.DataCase, async: true
 
-  @moduletag :ecto
-
   alias AttestoPhoenix.Schema.Authorization
   alias AttestoPhoenix.Store.EctoCodeStore
   alias Ecto.Adapters.SQL.Sandbox
+
+  @moduletag :ecto
 
   # take/1 does not gate on expiry; a future value keeps fixtures realistic.
   @future_seconds System.system_time(:second) + 600

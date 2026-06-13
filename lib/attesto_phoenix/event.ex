@@ -206,8 +206,7 @@ defmodule AttestoPhoenix.Event do
     :ok
   end
 
-  def dispatch({module, function}, %__MODULE__{} = event)
-      when is_atom(module) and is_atom(function) do
+  def dispatch({module, function}, %__MODULE__{} = event) when is_atom(module) and is_atom(function) do
     _ = apply(module, function, [event])
     :ok
   end

@@ -53,6 +53,7 @@ defmodule AttestoPhoenix.AuthorizationServer.PAR do
   alias AttestoPhoenix.AuthorizationServer.PAR.Request
   alias AttestoPhoenix.AuthorizationServer.RequestPolicy
   alias AttestoPhoenix.{Callback, Config, OAuthError}
+  alias AttestoPhoenix.Store.PAR.ETS
 
   @typedoc """
   The conn-free DPoP facts the controller lifts off the PAR request
@@ -244,7 +245,7 @@ defmodule AttestoPhoenix.AuthorizationServer.PAR do
   defp put_resolved_client_id(params, nil), do: params
   defp put_resolved_client_id(params, client_id), do: Map.put(params, "client_id", client_id)
 
-  defp par_store(config), do: config_field(config, :par_store, AttestoPhoenix.Store.PAR.ETS)
+  defp par_store(config), do: config_field(config, :par_store, ETS)
 
   defp dpop_proofs(dpop_input), do: Map.get(dpop_input, :proofs, [])
   defp http_uri(dpop_input), do: Map.get(dpop_input, :http_uri)
@@ -272,8 +273,7 @@ defmodule AttestoPhoenix.AuthorizationServer.PAR do
   # compact `request` JWT is retained so /authorize re-verifies it too. A PAR
   # carrying no `request` object is stored as-is - requiring its presence is a
   # separate profile concern.
-  defp verify_request_object(config, client, %{"request" => request})
-       when is_binary(request) and request != "" do
+  defp verify_request_object(config, client, %{"request" => request}) when is_binary(request) and request != "" do
     opts =
       [issuer: client_id(config, client), audience: config.issuer] ++
         RequestObject.Policy.to_verify_opts(request_object_policy(config))

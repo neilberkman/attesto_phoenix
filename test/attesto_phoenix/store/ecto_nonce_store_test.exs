@@ -65,7 +65,7 @@ defmodule AttestoPhoenix.Store.EctoNonceStoreTest do
 
       assert row
       assert is_nil(row.used_at)
-      assert DateTime.compare(row.expires_at, row.issued_at) == :gt
+      assert DateTime.after?(row.expires_at, row.issued_at)
     end
 
     test "rejects a non-positive ttl via the guard", %{config: config} do

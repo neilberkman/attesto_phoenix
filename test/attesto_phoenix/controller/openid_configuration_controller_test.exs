@@ -1,8 +1,8 @@
 defmodule AttestoPhoenix.Controller.OpenIDConfigurationControllerTest do
   use ExUnit.Case, async: true
 
-  import Plug.Test
   import Plug.Conn
+  import Plug.Test
 
   alias Attesto.Config, as: ProtocolConfig
   alias Attesto.PrincipalKind

@@ -84,6 +84,17 @@ defmodule AttestoPhoenix.Router do
   # `/.well-known/oauth-authorization-server` URI, and RFC 8615 reserves the
   # `/.well-known/` path segment at the host root. RFC 7517 §5 defines the JWK
   # Set document the metadata's `jwks_uri` points at.
+  alias AttestoPhoenix.Controller.AuthorizeController
+  alias AttestoPhoenix.Controller.DiscoveryController
+  alias AttestoPhoenix.Controller.IntrospectionController
+  alias AttestoPhoenix.Controller.JWKSController
+  alias AttestoPhoenix.Controller.OpenIDConfigurationController
+  alias AttestoPhoenix.Controller.PARController
+  alias AttestoPhoenix.Controller.RegistrationController
+  alias AttestoPhoenix.Controller.RevocationController
+  alias AttestoPhoenix.Controller.TokenController
+  alias AttestoPhoenix.Controller.UserinfoController
+
   @discovery_path "/.well-known/oauth-authorization-server"
   @jwks_path "/.well-known/jwks.json"
 
@@ -111,16 +122,16 @@ defmodule AttestoPhoenix.Router do
   # Controllers that back each endpoint. Named here once so the macro
   # expansion does not scatter controller module references through the
   # callers' router source.
-  @discovery_controller AttestoPhoenix.Controller.DiscoveryController
-  @openid_configuration_controller AttestoPhoenix.Controller.OpenIDConfigurationController
-  @jwks_controller AttestoPhoenix.Controller.JWKSController
-  @authorize_controller AttestoPhoenix.Controller.AuthorizeController
-  @token_controller AttestoPhoenix.Controller.TokenController
-  @par_controller AttestoPhoenix.Controller.PARController
-  @revocation_controller AttestoPhoenix.Controller.RevocationController
-  @introspection_controller AttestoPhoenix.Controller.IntrospectionController
-  @registration_controller AttestoPhoenix.Controller.RegistrationController
-  @userinfo_controller AttestoPhoenix.Controller.UserinfoController
+  @discovery_controller DiscoveryController
+  @openid_configuration_controller OpenIDConfigurationController
+  @jwks_controller JWKSController
+  @authorize_controller AuthorizeController
+  @token_controller TokenController
+  @par_controller PARController
+  @revocation_controller RevocationController
+  @introspection_controller IntrospectionController
+  @registration_controller RegistrationController
+  @userinfo_controller UserinfoController
 
   @doc false
   defmacro __using__(_opts) do

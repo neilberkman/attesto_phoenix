@@ -69,6 +69,8 @@ defmodule AttestoPhoenix.Controller.RevocationController do
   # Dispatch through the action plug so the module is a complete `Plug`
   # (`init/1` + `call/2`): the router invokes it as a plug, selecting the
   # action from `conn.private[:phoenix_action]` set by `init/1`.
+  alias AttestoPhoenix.Store.EctoRefreshStore
+
   plug :action
 
   # RFC 7009 §2.2: a successful revocation request returns HTTP 200 with an
@@ -110,7 +112,7 @@ defmodule AttestoPhoenix.Controller.RevocationController do
   # the default; the host pipeline may override it through conn.private to
   # select a different Attesto.RefreshStore (e.g. the single-node ETS store).
   @refresh_store_key :attesto_phoenix_refresh_store
-  @default_refresh_store AttestoPhoenix.Store.EctoRefreshStore
+  @default_refresh_store EctoRefreshStore
 
   @doc """
   Handle `POST /oauth/revoke` (RFC 7009 §2.1).
@@ -236,8 +238,7 @@ defmodule AttestoPhoenix.Controller.RevocationController do
     end
   end
 
-  defp authenticate_client(config, client_id, client_secret)
-       when is_binary(client_id) and is_binary(client_secret) do
+  defp authenticate_client(config, client_id, client_secret) when is_binary(client_id) and is_binary(client_secret) do
     # RFC 6749 §5.2: an unknown or revoked client, and a wrong secret, all
     # surface to the caller as the same `invalid_client` so the endpoint is
     # not an existence oracle for client ids.

@@ -16,9 +16,9 @@ defmodule AttestoPhoenix.DataCase do
       # Every case that touches the database is tagged so a default run
       # (no SQL backend) excludes it via `ExUnit.configure(exclude: [:ecto])`
       # in test_helper.exs. Run them with `mix test --include ecto`.
-      @moduletag :ecto
-
       alias AttestoPhoenix.TestRepo
+
+      @moduletag :ecto
     end
   end
 

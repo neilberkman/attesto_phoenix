@@ -94,11 +94,9 @@ if Code.ensure_loaded?(Igniter) do
     # `AttestoPhoenix.Config` keys the config skeleton wires.
     @scaffolds [
       {ClientStore, AttestoPhoenix.ClientStore, [{:load_client, 1}, {:verify_client_secret, 2}]},
-      {PrincipalStore, AttestoPhoenix.PrincipalStore,
-       [{:load_principal, 1}, {:build_principal, 3}]},
+      {PrincipalStore, AttestoPhoenix.PrincipalStore, [{:load_principal, 1}, {:build_principal, 3}]},
       {ScopePolicy, AttestoPhoenix.ScopePolicy, [{:authorize_scope, 2}]},
-      {ConsentPolicy, AttestoPhoenix.ConsentPolicy,
-       [{:authenticate_resource_owner, 3}, {:consent, 3}]},
+      {ConsentPolicy, AttestoPhoenix.ConsentPolicy, [{:authenticate_resource_owner, 3}, {:consent, 3}]},
       {RegistrationStore, AttestoPhoenix.RegistrationStore,
        [
          {:register_client, 1},

@@ -109,6 +109,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
   alias Attesto.Secret
   alias AttestoPhoenix.AuthorizationServer.RequestPolicy
   alias AttestoPhoenix.{Callback, Config, Event, RequestContext}
+  alias AttestoPhoenix.Store.PAR.ETS
 
   require Logger
 
@@ -259,8 +260,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
   # The `request_uri` reference scheme this AS issues from its PAR endpoint
   # (RFC 9126 §2.2); a store miss on one of these is an expired/unknown PAR
   # reference, distinct from an unsupported external request_uri.
-  defp par_request_uri?(request_uri),
-    do: String.starts_with?(request_uri, "urn:ietf:params:oauth:request_uri:")
+  defp par_request_uri?(request_uri), do: String.starts_with?(request_uri, "urn:ietf:params:oauth:request_uri:")
 
   # RFC 9126 §2.2: the `request_uri` is bound to the client that pushed it. The
   # stored, verified PAR parameters are authoritative (front-channel parameters
@@ -303,7 +303,7 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
 
   defp require_par_if_configured(_config, _request, true), do: :ok
 
-  defp par_store(config), do: config_field(config, :par_store, AttestoPhoenix.Store.PAR.ETS)
+  defp par_store(config), do: config_field(config, :par_store, ETS)
 
   defp client_jwks(config, client) do
     case Config.client_jwks_fun(config) do
@@ -877,14 +877,11 @@ defmodule AttestoPhoenix.Controller.AuthorizeController do
   defp direct_error_description(:missing_redirect_uri), do: "redirect_uri is required"
   defp direct_error_description(:invalid_redirect_uri), do: "redirect_uri is invalid"
 
-  defp direct_error_description(:redirect_uri_not_registered),
-    do: "redirect_uri is not registered for this client"
+  defp direct_error_description(:redirect_uri_not_registered), do: "redirect_uri is not registered for this client"
 
-  defp direct_error_description(:invalid_request_uri),
-    do: "the request_uri is unknown or has expired"
+  defp direct_error_description(:invalid_request_uri), do: "the request_uri is unknown or has expired"
 
-  defp direct_error_description(:request_uri_client_mismatch),
-    do: "the request_uri was not issued to this client"
+  defp direct_error_description(:request_uri_client_mismatch), do: "the request_uri was not issued to this client"
 
   defp direct_error_description(_), do: "invalid authorization request"
 

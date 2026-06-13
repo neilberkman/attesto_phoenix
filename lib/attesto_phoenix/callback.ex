@@ -21,13 +21,10 @@ defmodule AttestoPhoenix.Callback do
   @spec invoke(callback(), [any()]) :: any()
   def invoke(fun, args) when is_function(fun) and is_list(args), do: apply(fun, args)
 
-  def invoke({module, fun}, args)
-      when is_atom(module) and is_atom(fun) and is_list(args),
-      do: apply(module, fun, args)
+  def invoke({module, fun}, args) when is_atom(module) and is_atom(fun) and is_list(args), do: apply(module, fun, args)
 
-  def invoke({module, fun, extra}, args)
-      when is_atom(module) and is_atom(fun) and is_list(extra) and is_list(args),
-      do: apply(module, fun, args ++ extra)
+  def invoke({module, fun, extra}, args) when is_atom(module) and is_atom(fun) and is_list(extra) and is_list(args),
+    do: apply(module, fun, args ++ extra)
 
   @doc """
   Invoke `callback` with `args`, returning `default` when `callback` is `nil`.
@@ -46,8 +43,7 @@ defmodule AttestoPhoenix.Callback do
   unchanged for an `invoke/2,3` caller to run. It carries no policy.
   """
   @spec config_callback(map(), atom()) :: callback() | nil
-  def config_callback(config, key) when is_map(config) and is_atom(key),
-    do: Map.get(config, key)
+  def config_callback(config, key) when is_map(config) and is_atom(key), do: Map.get(config, key)
 
   @doc """
   Read a boolean policy flag off the config struct by `key`.
@@ -56,6 +52,5 @@ defmodule AttestoPhoenix.Callback do
   did not set never turns a control on).
   """
   @spec config_flag(map(), atom()) :: boolean()
-  def config_flag(config, key) when is_map(config) and is_atom(key),
-    do: Map.get(config, key) == true
+  def config_flag(config, key) when is_map(config) and is_atom(key), do: Map.get(config, key) == true
 end
